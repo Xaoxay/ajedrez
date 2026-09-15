@@ -1,7 +1,58 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { getSavedGame, clearSavedGame } from '../utils/gameStorage';
 
 export default function HomeScreen({ navigation }) {
+  const [savedGame, setSavedGame] = useState(null);
+
+  // Comprobar si hay una partida guardada cada vez que se entra a la pantalla
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+      (async () => {
+        const game = await getSavedGame();
+        if (isActive) {
+          setSavedGame(game);
+        }
+      })();
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
+
+  const handleDeleteSavedGame = () => {
+    Alert.alert(
+      'Descartar Partida',
+      '¿Deseas eliminar la partida guardada de tu dispositivo?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            await clearSavedGame();
+            setSavedGame(null);
+          },
+        },
+      ]
+    );
+  };
+
+  const getModeLabel = (mode) => {
+    switch (mode) {
+      case 'bot':
+        return 'Contra la Máquina';
+      case 'timer':
+        return 'Contrarreloj';
+      case 'sudden_death':
+        return 'Muerte Súbita';
+      default:
+        return 'Duelo Local';
+    }
+  };
+
   const gameModes = [
     {
       id: 'local',
@@ -64,6 +115,38 @@ export default function HomeScreen({ navigation }) {
         </View>
       </View>
 
+      {/* Tarjeta de Partida Guardada (si existe) */}
+      {savedGame && (
+        <View style={styles.savedContainer}>
+          <TouchableOpacity
+            style={styles.savedCard}
+            activeOpacity={0.8}
+            onPress={() =>
+              navigation.navigate('Game', {
+                mode: savedGame.mode,
+                timeLimit: savedGame.timeLimit,
+                turnLimit: savedGame.turnLimit,
+                savedGame: savedGame,
+              })
+            }
+          >
+            <View style={styles.savedCardHeader}>
+              <Text style={styles.savedTitle}>📂 Continuar Partida</Text>
+              <TouchableOpacity onPress={handleDeleteSavedGame} style={styles.deleteButton}>
+                <Text style={styles.deleteText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.savedDetails}>
+              Modo: {getModeLabel(savedGame.mode)} • Turno:{' '}
+              {savedGame.currentTurn === 'w' ? '⚪ Blancas' : '⚫ Negras'}
+            </Text>
+            <Text style={styles.savedTime}>
+              Guardada en este dispositivo
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.modesContainer}>
         {gameModes.map((item) => (
           <TouchableOpacity
@@ -101,7 +184,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: 25,
+    marginBottom: 20,
   },
   title: {
     fontSize: 32,
@@ -127,6 +210,51 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#ecf0f1',
     fontWeight: '600',
+  },
+  // Partida guardada
+  savedContainer: {
+    width: '100%',
+    marginBottom: 16,
+  },
+  savedCard: {
+    backgroundColor: '#1e272e',
+    borderColor: '#d3a625',
+    borderWidth: 2,
+    borderRadius: 14,
+    padding: 16,
+    shadowColor: '#d3a625',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  savedCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  savedTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#d3a625',
+  },
+  deleteButton: {
+    padding: 4,
+  },
+  deleteText: {
+    color: '#ff6b81',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  savedDetails: {
+    color: '#f1f2f6',
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  savedTime: {
+    color: '#a4b0be',
+    fontSize: 12,
   },
   modesContainer: {
     width: '100%',

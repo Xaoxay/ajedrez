@@ -10,25 +10,36 @@ import {
 } from 'react-native';
 import Chessboard from 'react-native-chessboard';
 import { getBestMove } from '../utils/chessAi';
+import { saveGameLocally } from '../utils/gameStorage';
 
 export default function GameScreen({ route, navigation }) {
-  const { mode = 'local', timeLimit = 300, turnLimit = 15 } = route.params || {};
+  const { mode = 'local', timeLimit = 300, turnLimit = 15, savedGame = null } =
+    route.params || {};
 
   const chessboardRef = useRef(null);
   const timerIntervalRef = useRef(null);
 
   // Estados de la partida
-  const [currentTurn, setCurrentTurn] = useState('w'); // 'w' o 'b'
+  const [currentTurn, setCurrentTurn] = useState(savedGame ? savedGame.currentTurn : 'w');
   const [isGameOver, setIsGameOver] = useState(false);
   const [gameOverText, setGameOverText] = useState('');
-  const [isFlipped, setIsFlipped] = useState(false);
+  const [isFlipped, setIsFlipped] = useState(savedGame ? savedGame.isFlipped : false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [isBotThinking, setIsBotThinking] = useState(false);
 
   // Estados de reloj
-  const [whiteTime, setWhiteTime] = useState(timeLimit);
-  const [blackTime, setBlackTime] = useState(timeLimit);
-  const [turnTime, setTurnTime] = useState(turnLimit);
+  const [whiteTime, setWhiteTime] = useState(savedGame ? savedGame.whiteTime : timeLimit);
+  const [blackTime, setBlackTime] = useState(savedGame ? savedGame.blackTime : timeLimit);
+  const [turnTime, setTurnTime] = useState(savedGame ? savedGame.turnTime : turnLimit);
+
+  // Cargar tablero si venimos de partida guardada
+  useEffect(() => {
+    if (savedGame && savedGame.fen) {
+      setTimeout(() => {
+        chessboardRef.current?.resetBoard(savedGame.fen);
+      }, 300);
+    }
+  }, [savedGame]);
 
   // Formato mm:ss
   const formatTime = (seconds) => {
@@ -154,6 +165,38 @@ export default function GameScreen({ route, navigation }) {
       triggerBotMove(state.fen);
     }
   }, [currentTurn, mode, turnLimit, triggerBotMove]);
+
+  // Guardar partida en el dispositivo
+  const handleSaveGame = async () => {
+    const state = chessboardRef.current?.getState();
+    const fen = state?.fen;
+    if (!fen) {
+      Alert.alert('Error', 'No se pudo obtener el estado del tablero.');
+      return;
+    }
+
+    const ok = await saveGameLocally({
+      fen,
+      mode,
+      currentTurn,
+      whiteTime,
+      blackTime,
+      turnTime,
+      isFlipped,
+      timeLimit,
+      turnLimit,
+    });
+
+    setMenuVisible(false);
+    if (ok) {
+      Alert.alert(
+        '💾 Partida Guardada',
+        'Tu partida ha sido guardada en tu dispositivo. Puedes retomarla en cualquier momento desde la Sala Principal.'
+      );
+    } else {
+      Alert.alert('Error', 'No se pudo guardar la partida en el almacenamiento local.');
+    }
+  };
 
   // Reiniciar juego
   const resetGame = () => {
@@ -304,6 +347,10 @@ export default function GameScreen({ route, navigation }) {
             </View>
 
             <View style={styles.drawerButtons}>
+              <TouchableOpacity style={[styles.drawerItem, styles.saveItem]} onPress={handleSaveGame}>
+                <Text style={[styles.drawerItemText, styles.saveText]}>💾 Guardar Partida</Text>
+              </TouchableOpacity>
+
               <TouchableOpacity style={styles.drawerItem} onPress={resetGame}>
                 <Text style={styles.drawerItemText}>🔄 Reiniciar Duelo</Text>
               </TouchableOpacity>
@@ -495,6 +542,14 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  saveItem: {
+    backgroundColor: '#1e3799',
+    borderColor: '#4a69bd',
+  },
+  saveText: {
+    color: '#ffffff',
+    fontWeight: 'bold',
   },
   surrenderItem: {
     borderColor: '#5c2025',

@@ -9,6 +9,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import Chessboard from 'react-native-chessboard';
+import Chessboard3D from '../components/Chessboard3D';
 import { getBestMove } from '../utils/chessAi';
 import { saveGameLocally, recordGameResult } from '../utils/gameStorage';
 
@@ -28,9 +29,13 @@ export default function GameScreen({ route, navigation }) {
 
   // Estados de la partida
   const [currentTurn, setCurrentTurn] = useState(savedGame ? savedGame.currentTurn : 'w');
+  const [currentFen, setCurrentFen] = useState(
+    savedGame ? savedGame.fen : 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+  );
   const [isGameOver, setIsGameOver] = useState(false);
   const [gameOverText, setGameOverText] = useState('');
   const [isFlipped, setIsFlipped] = useState(savedGame ? savedGame.isFlipped : false);
+  const [viewMode, setViewMode] = useState('2d'); // '2d' o '3d'
   const [menuVisible, setMenuVisible] = useState(false);
   const [isBotThinking, setIsBotThinking] = useState(false);
 
@@ -44,6 +49,7 @@ export default function GameScreen({ route, navigation }) {
     if (savedGame && savedGame.fen) {
       setTimeout(() => {
         chessboardRef.current?.resetBoard(savedGame.fen);
+        setCurrentFen(savedGame.fen);
       }, 300);
     }
   }, [savedGame]);
@@ -122,7 +128,6 @@ export default function GameScreen({ route, navigation }) {
     if (isGameOver) return;
     setIsBotThinking(true);
 
-    // Pequeño retardo de pensamiento táctico
     setTimeout(async () => {
       try {
         const botMove = await getBestMove(fen, currentDifficulty);
@@ -145,6 +150,10 @@ export default function GameScreen({ route, navigation }) {
   const handleMove = useCallback((info) => {
     const state = chessboardRef.current?.getState();
     if (!state) return;
+
+    if (state.fen) {
+      setCurrentFen(state.fen);
+    }
 
     // Detectar turno desde el FEN
     const fenTurn = state.fen ? state.fen.split(' ')[1] : (currentTurn === 'w' ? 'b' : 'w');
@@ -186,10 +195,22 @@ export default function GameScreen({ route, navigation }) {
     }
   }, [currentTurn, mode, turnLimit, triggerBotMove]);
 
+  // Mover desde la vista 3D
+  const handleMove3D = async ({ from, to }) => {
+    if (isGameOver || (mode === 'bot' && currentTurn === 'b')) return;
+    try {
+      if (chessboardRef.current) {
+        await chessboardRef.current.move({ from, to, promotion: 'q' });
+      }
+    } catch (e) {
+      console.warn('Jugada 3D inválida:', e);
+    }
+  };
+
   // Guardar partida en el dispositivo
   const handleSaveGame = async () => {
     const state = chessboardRef.current?.getState();
-    const fen = state?.fen;
+    const fen = state?.fen || currentFen;
     if (!fen) {
       Alert.alert('Error', 'No se pudo obtener el estado del tablero.');
       return;
@@ -222,6 +243,8 @@ export default function GameScreen({ route, navigation }) {
   // Reiniciar juego
   const resetGame = () => {
     chessboardRef.current?.resetBoard();
+    const defaultFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+    setCurrentFen(defaultFen);
     setIsGameOver(false);
     setGameOverText('');
     setCurrentTurn('w');
@@ -281,7 +304,7 @@ export default function GameScreen({ route, navigation }) {
     switch (mode) {
       case 'bot':
         return currentDifficulty === 'magnus'
-          ? '👑 Duelo vs Magnus Carlsen'
+          ? '👑 Magnus Carlsen'
           : `🤖 vs Máquina (${currentDifficulty.toUpperCase()})`;
       case 'timer':
         return `⏳ Contrarreloj (${Math.floor(timeLimit / 60)}m)`;
@@ -296,7 +319,7 @@ export default function GameScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Barra Superior con Título y Botón de Menú Ocultable */}
+      {/* Barra Superior */}
       <View style={styles.topBar}>
         <View style={styles.titleContainer}>
           <Text style={styles.modeTitle}>{getModeTitle()}</Text>
@@ -311,13 +334,23 @@ export default function GameScreen({ route, navigation }) {
           )}
         </View>
 
-        <TouchableOpacity
-          style={styles.menuIconButton}
-          onPress={() => setMenuVisible(true)}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.menuIconText}>⚙️ Menú</Text>
-        </TouchableOpacity>
+        <View style={styles.topActions}>
+          <TouchableOpacity
+            style={[styles.viewToggleButton, viewMode === '3d' && styles.viewToggleActive]}
+            onPress={() => setViewMode((prev) => (prev === '2d' ? '3d' : '2d'))}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.viewToggleText}>{viewMode === '2d' ? '🧊 Modo 3D' : '♟️ Modo 2D'}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuIconButton}
+            onPress={() => setMenuVisible(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.menuIconText}>⚙️</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Reloj / Panel de Jugador Superior (Negras / Bot) */}
@@ -337,20 +370,34 @@ export default function GameScreen({ route, navigation }) {
         )}
       </View>
 
-      {/* Tablero de Ajedrez */}
+      {/* Tablero de Ajedrez (2D o 3D) */}
       <View style={styles.boardWrapper}>
-        <Chessboard
-          ref={chessboardRef}
-          onMove={handleMove}
-          gestureEnabled={!isGameOver && !(mode === 'bot' && currentTurn === 'b')}
-          flipped={isFlipped}
-          colors={{
-            black: '#4b6584',
-            white: '#d1d8e0',
-            lastMoveHighlight: 'rgba(211, 166, 37, 0.5)',
-            checkmateHighlight: '#e74c3c',
-          }}
-        />
+        {/* El componente 2D siempre está montado para mantener el estado del motor y arbitrar reglas */}
+        <View style={viewMode === '2d' ? styles.visibleBoard : styles.hiddenBoard}>
+          <Chessboard
+            ref={chessboardRef}
+            onMove={handleMove}
+            gestureEnabled={!isGameOver && !(mode === 'bot' && currentTurn === 'b')}
+            flipped={isFlipped}
+            colors={{
+              black: '#4b6584',
+              white: '#d1d8e0',
+              lastMoveHighlight: 'rgba(211, 166, 37, 0.5)',
+              checkmateHighlight: '#e74c3c',
+            }}
+          />
+        </View>
+
+        {viewMode === '3d' && (
+          <View style={styles.visibleBoard}>
+            <Chessboard3D
+              fen={currentFen}
+              onMove={handleMove3D}
+              flipped={isFlipped}
+              gestureEnabled={!isGameOver && !(mode === 'bot' && currentTurn === 'b')}
+            />
+          </View>
+        )}
       </View>
 
       {/* Reloj / Panel de Jugador Inferior (Blancas) */}
@@ -391,6 +438,18 @@ export default function GameScreen({ route, navigation }) {
             </View>
 
             <View style={styles.drawerButtons}>
+              <TouchableOpacity
+                style={[styles.drawerItem, styles.viewItem]}
+                onPress={() => {
+                  setViewMode((prev) => (prev === '2d' ? '3d' : '2d'));
+                  setMenuVisible(false);
+                }}
+              >
+                <Text style={styles.drawerItemText}>
+                  {viewMode === '2d' ? '🧊 Cambiar a Tablero 3D' : '♟️ Cambiar a Tablero 2D'}
+                </Text>
+              </TouchableOpacity>
+
               <TouchableOpacity style={[styles.drawerItem, styles.saveItem]} onPress={handleSaveGame}>
                 <Text style={[styles.drawerItemText, styles.saveText]}>💾 Guardar Partida</Text>
               </TouchableOpacity>
@@ -455,24 +514,46 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modeTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#d3a625', // Gryffindor Gold
   },
   turnSubtext: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#a4b0be',
     marginTop: 2,
   },
   winnerText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#2ed573',
     fontWeight: 'bold',
     marginTop: 2,
   },
+  topActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  viewToggleButton: {
+    backgroundColor: '#272733',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#3f3f50',
+  },
+  viewToggleActive: {
+    borderColor: '#d3a625',
+    backgroundColor: '#2b271d',
+  },
+  viewToggleText: {
+    color: '#d3a625',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
   menuIconButton: {
     backgroundColor: '#272733',
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
@@ -481,7 +562,7 @@ const styles = StyleSheet.create({
   menuIconText: {
     color: '#f1f2f6',
     fontWeight: 'bold',
-    fontSize: 13,
+    fontSize: 14,
   },
   playerBanner: {
     width: '92%',
@@ -531,6 +612,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 10,
     elevation: 8,
+  },
+  visibleBoard: {
+    width: '100%',
+    height: '100%',
+  },
+  hiddenBoard: {
+    width: 0,
+    height: 0,
+    overflow: 'hidden',
+    opacity: 0,
   },
   // Estilos del Menú Desplegable / Ocultable
   modalOverlay: {
@@ -590,6 +681,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  viewItem: {
+    backgroundColor: '#2b271d',
+    borderColor: '#d3a625',
   },
   saveItem: {
     backgroundColor: '#1e3799',

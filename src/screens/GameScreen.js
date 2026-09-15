@@ -10,11 +10,18 @@ import {
 } from 'react-native';
 import Chessboard from 'react-native-chessboard';
 import { getBestMove } from '../utils/chessAi';
-import { saveGameLocally } from '../utils/gameStorage';
+import { saveGameLocally, recordGameResult } from '../utils/gameStorage';
 
 export default function GameScreen({ route, navigation }) {
-  const { mode = 'local', timeLimit = 300, turnLimit = 15, savedGame = null } =
-    route.params || {};
+  const {
+    mode = 'local',
+    difficulty = 'medio',
+    timeLimit = 300,
+    turnLimit = 15,
+    savedGame = null,
+  } = route.params || {};
+
+  const currentDifficulty = savedGame ? savedGame.difficulty || difficulty : difficulty;
 
   const chessboardRef = useRef(null);
   const timerIntervalRef = useRef(null);
@@ -54,8 +61,14 @@ export default function GameScreen({ route, navigation }) {
     const winner = loserColor === 'w' ? 'Negras' : 'Blancas';
     const text = `¡Tiempo agotado! Ganan las ${winner}`;
     setGameOverText(text);
+
+    if (mode === 'bot') {
+      if (winner === 'Blancas') recordGameResult('win');
+      else recordGameResult('loss');
+    }
+
     Alert.alert('⌛ Tiempo Agotado', text);
-  }, []);
+  }, [mode]);
 
   // Lógica de temporizadores
   useEffect(() => {
@@ -109,10 +122,10 @@ export default function GameScreen({ route, navigation }) {
     if (isGameOver) return;
     setIsBotThinking(true);
 
-    // Simular retardo de pensamiento táctico
+    // Pequeño retardo de pensamiento táctico
     setTimeout(async () => {
       try {
-        const botMove = getBestMove(fen);
+        const botMove = await getBestMove(fen, currentDifficulty);
         if (botMove && chessboardRef.current) {
           await chessboardRef.current.move({
             from: botMove.from,
@@ -125,8 +138,8 @@ export default function GameScreen({ route, navigation }) {
       } finally {
         setIsBotThinking(false);
       }
-    }, 700);
-  }, [isGameOver]);
+    }, currentDifficulty === 'magnus' ? 400 : 700);
+  }, [isGameOver, currentDifficulty]);
 
   // Manejador tras cada movimiento en el tablero
   const handleMove = useCallback((info) => {
@@ -151,10 +164,17 @@ export default function GameScreen({ route, navigation }) {
         const winner = lastMove?.color === 'w' ? 'Blancas' : 'Negras';
         const msg = `¡Jaque Mate! Ganan las ${winner}`;
         setGameOverText(msg);
+
+        if (mode === 'bot') {
+          if (winner === 'Blancas') recordGameResult('win');
+          else recordGameResult('loss');
+        }
+
         Alert.alert('¡Victoria Mágica!', msg);
       } else {
         const msg = 'Empate (Tablas)';
         setGameOverText(msg);
+        if (mode === 'bot') recordGameResult('draw');
         Alert.alert('Tablas', 'El duelo ha concluido en empate.');
       }
       return;
@@ -178,6 +198,7 @@ export default function GameScreen({ route, navigation }) {
     const ok = await saveGameLocally({
       fen,
       mode,
+      difficulty: currentDifficulty,
       currentTurn,
       whiteTime,
       blackTime,
@@ -227,6 +248,11 @@ export default function GameScreen({ route, navigation }) {
             const winner = currentTurn === 'w' ? 'Negras' : 'Blancas';
             const msg = `Rendición: Ganan las ${winner}`;
             setGameOverText(msg);
+
+            if (mode === 'bot') {
+              recordGameResult('loss');
+            }
+
             Alert.alert('Duelo Terminado', msg);
           },
         },
@@ -234,11 +260,29 @@ export default function GameScreen({ route, navigation }) {
     );
   };
 
+  const getOpponentLabel = () => {
+    if (mode !== 'bot') return '⚫ Jugador Negras';
+    switch (currentDifficulty) {
+      case 'magnus':
+        return '👑 Magnus Carlsen';
+      case 'dificil':
+        return '🤖 Autómata (Difícil)';
+      case 'adaptada':
+        return '⚡ Autómata (Adaptada)';
+      case 'normal':
+        return '🟢 Autómata (Normal)';
+      default:
+        return '🟡 Autómata (Medio)';
+    }
+  };
+
   // Obtener nombre del modo para la barra superior
   const getModeTitle = () => {
     switch (mode) {
       case 'bot':
-        return '🤖 Contra la Máquina';
+        return currentDifficulty === 'magnus'
+          ? '👑 Duelo vs Magnus Carlsen'
+          : `🤖 vs Máquina (${currentDifficulty.toUpperCase()})`;
       case 'timer':
         return `⏳ Contrarreloj (${Math.floor(timeLimit / 60)}m)`;
       case 'sudden_death':
@@ -261,7 +305,7 @@ export default function GameScreen({ route, navigation }) {
           ) : (
             <Text style={styles.turnSubtext}>
               {mode === 'bot' && currentTurn === 'b'
-                ? '🤖 La máquina está pensando...'
+                ? `${currentDifficulty === 'magnus' ? '👑 Magnus' : '🤖 La máquina'} está calculando...`
                 : `Turno: ${currentTurn === 'w' ? '⚪ Blancas' : '⚫ Negras'}`}
             </Text>
           )}
@@ -276,10 +320,10 @@ export default function GameScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* Reloj / Panel de Jugador Superior (Negras) */}
+      {/* Reloj / Panel de Jugador Superior (Negras / Bot) */}
       <View style={[styles.playerBanner, currentTurn === 'b' && !isGameOver && styles.activePlayerBanner]}>
-        <Text style={styles.playerName}>
-          {mode === 'bot' ? '🤖 Autómata (Negras)' : '⚫ Jugador Negras'}
+        <Text style={[styles.playerName, currentDifficulty === 'magnus' && mode === 'bot' && styles.magnusText]}>
+          {getOpponentLabel()}
         </Text>
         {mode === 'timer' && (
           <Text style={[styles.clockText, currentTurn === 'b' && styles.activeClockText]}>
@@ -459,6 +503,10 @@ const styles = StyleSheet.create({
     color: '#ced6e0',
     fontSize: 15,
     fontWeight: '600',
+  },
+  magnusText: {
+    color: '#d3a625',
+    fontWeight: 'bold',
   },
   clockText: {
     color: '#a4b0be',

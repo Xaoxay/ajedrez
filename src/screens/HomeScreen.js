@@ -1,19 +1,31 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  Modal,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { getSavedGame, clearSavedGame } from '../utils/gameStorage';
+import { getSavedGame, clearSavedGame, getPlayerStats } from '../utils/gameStorage';
 
 export default function HomeScreen({ navigation }) {
   const [savedGame, setSavedGame] = useState(null);
+  const [stats, setStats] = useState({ wins: 0, losses: 0, draws: 0 });
+  const [difficultyModalVisible, setDifficultyModalVisible] = useState(false);
 
-  // Comprobar si hay una partida guardada cada vez que se entra a la pantalla
+  // Comprobar si hay una partida guardada y estadísticas cada vez que se entra a la pantalla
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
       (async () => {
         const game = await getSavedGame();
+        const playerStats = await getPlayerStats();
         if (isActive) {
           setSavedGame(game);
+          setStats(playerStats);
         }
       })();
       return () => {
@@ -40,10 +52,10 @@ export default function HomeScreen({ navigation }) {
     );
   };
 
-  const getModeLabel = (mode) => {
+  const getModeLabel = (mode, difficulty) => {
     switch (mode) {
       case 'bot':
-        return 'Contra la Máquina';
+        return `Contra la Máquina (${getDifficultyLabel(difficulty)})`;
       case 'timer':
         return 'Contrarreloj';
       case 'sudden_death':
@@ -53,6 +65,60 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
+  const getDifficultyLabel = (diff) => {
+    switch (diff) {
+      case 'normal':
+        return 'Normal';
+      case 'dificil':
+        return 'Difícil';
+      case 'adaptada':
+        return 'Adaptada';
+      case 'magnus':
+        return '👑 Magnus Carlsen';
+      default:
+        return 'Medio';
+    }
+  };
+
+  const difficulties = [
+    {
+      id: 'normal',
+      title: '🟢 Normal',
+      desc: 'Movimientos básicos, comete errores humanos ocasionales.',
+      color: '#2ed573',
+    },
+    {
+      id: 'medio',
+      title: '🟡 Medio',
+      desc: 'Táctica equilibrada, defiende piezas y busca capturas.',
+      color: '#ffa502',
+    },
+    {
+      id: 'dificil',
+      title: '🔴 Difícil',
+      desc: 'Cálculo profundo Minimax, anticipa tus jugadas.',
+      color: '#ff4757',
+    },
+    {
+      id: 'adaptada',
+      title: '⚡ Adaptada (IA Dinámica)',
+      desc: 'El bot ajusta su fuerza según tu historial de juego.',
+      color: '#1e90ff',
+    },
+    {
+      id: 'magnus',
+      title: '👑 Magnus Carlsen',
+      desc: 'El Gran Maestro Campeón del Mundo: implacable y letal.',
+      color: '#d3a625',
+      special: true,
+    },
+  ];
+
+  const handleSelectDifficulty = (difficultyId) => {
+    setDifficultyModalVisible(false);
+    navigation.navigate('Game', { mode: 'bot', difficulty: difficultyId });
+  };
+
   const gameModes = [
     {
       id: 'local',
@@ -60,15 +126,15 @@ export default function HomeScreen({ navigation }) {
       desc: 'Dos magos frente a frente en el mismo tablero.',
       color: '#2a623d', // Slytherin Green
       border: '#5d8a68',
-      params: { mode: 'local' },
+      action: () => navigation.navigate('Game', { mode: 'local' }),
     },
     {
       id: 'bot',
       title: '🤖 Contra la Máquina',
-      desc: 'Enfréntate al autómata de ajedrez mágico.',
+      desc: 'Elige tu nivel: Normal, Medio, Difícil, Adaptada o Magnus.',
       color: '#0e1a40', // Ravenclaw Blue
       border: '#4a69bd',
-      params: { mode: 'bot' },
+      action: () => setDifficultyModalVisible(true),
     },
     {
       id: 'timer_3',
@@ -76,7 +142,7 @@ export default function HomeScreen({ navigation }) {
       desc: 'Partida Blitz rápida con reloj de ajedrez.',
       color: '#740001', // Gryffindor Red
       border: '#b83b3e',
-      params: { mode: 'timer', timeLimit: 180 },
+      action: () => navigation.navigate('Game', { mode: 'timer', timeLimit: 180 }),
     },
     {
       id: 'timer_5',
@@ -84,7 +150,7 @@ export default function HomeScreen({ navigation }) {
       desc: 'Tiempo estándar para duelos de alta tensión.',
       color: '#5c1b24',
       border: '#a34855',
-      params: { mode: 'timer', timeLimit: 300 },
+      action: () => navigation.navigate('Game', { mode: 'timer', timeLimit: 300 }),
     },
     {
       id: 'sudden_death',
@@ -93,7 +159,7 @@ export default function HomeScreen({ navigation }) {
       color: '#d3a625', // Gold
       textColor: '#1a1a1a',
       border: '#f5cd79',
-      params: { mode: 'sudden_death', turnLimit: 15 },
+      action: () => navigation.navigate('Game', { mode: 'sudden_death', turnLimit: 15 }),
     },
     {
       id: 'online',
@@ -101,7 +167,7 @@ export default function HomeScreen({ navigation }) {
       desc: 'Juega a distancia con amigos (Próximamente).',
       color: '#222f3e',
       border: '#576574',
-      params: { mode: 'online' },
+      action: () => navigation.navigate('Game', { mode: 'online' }),
     },
   ];
 
@@ -113,6 +179,9 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.badge}>
           <Text style={styles.rank}>🧙‍♂️ Rango: Aprendiz Muggle</Text>
         </View>
+        <Text style={styles.statsText}>
+          Record vs IA: {stats.wins}V - {stats.losses}D {stats.draws > 0 ? `(${stats.draws}E)` : ''}
+        </Text>
       </View>
 
       {/* Tarjeta de Partida Guardada (si existe) */}
@@ -124,6 +193,7 @@ export default function HomeScreen({ navigation }) {
             onPress={() =>
               navigation.navigate('Game', {
                 mode: savedGame.mode,
+                difficulty: savedGame.difficulty,
                 timeLimit: savedGame.timeLimit,
                 turnLimit: savedGame.turnLimit,
                 savedGame: savedGame,
@@ -137,16 +207,15 @@ export default function HomeScreen({ navigation }) {
               </TouchableOpacity>
             </View>
             <Text style={styles.savedDetails}>
-              Modo: {getModeLabel(savedGame.mode)} • Turno:{' '}
+              Modo: {getModeLabel(savedGame.mode, savedGame.difficulty)} • Turno:{' '}
               {savedGame.currentTurn === 'w' ? '⚪ Blancas' : '⚫ Negras'}
             </Text>
-            <Text style={styles.savedTime}>
-              Guardada en este dispositivo
-            </Text>
+            <Text style={styles.savedTime}>Guardada en este dispositivo</Text>
           </TouchableOpacity>
         </View>
       )}
 
+      {/* Modos de Juego */}
       <View style={styles.modesContainer}>
         {gameModes.map((item) => (
           <TouchableOpacity
@@ -156,7 +225,7 @@ export default function HomeScreen({ navigation }) {
               { backgroundColor: item.color, borderColor: item.border },
             ]}
             activeOpacity={0.8}
-            onPress={() => navigation.navigate('Game', item.params)}
+            onPress={item.action}
           >
             <Text style={[styles.cardTitle, item.textColor ? { color: item.textColor } : null]}>
               {item.title}
@@ -167,6 +236,51 @@ export default function HomeScreen({ navigation }) {
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* Modal Selector de Dificultad para Modo Bot */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={difficultyModalVisible}
+        onRequestClose={() => setDifficultyModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setDifficultyModalVisible(false)}
+        >
+          <View style={styles.difficultyCard} onStartShouldSetResponder={() => true}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Dificultad del Oponente</Text>
+              <TouchableOpacity
+                onPress={() => setDifficultyModalVisible(false)}
+                style={styles.closeBtn}
+              >
+                <Text style={styles.closeBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.difficultyList}>
+              {difficulties.map((diff) => (
+                <TouchableOpacity
+                  key={diff.id}
+                  style={[
+                    styles.diffItem,
+                    diff.special && styles.magnusItem,
+                  ]}
+                  activeOpacity={0.7}
+                  onPress={() => handleSelectDifficulty(diff.id)}
+                >
+                  <Text style={[styles.diffTitle, { color: diff.color }]}>
+                    {diff.title}
+                  </Text>
+                  <Text style={styles.diffDesc}>{diff.desc}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </ScrollView>
   );
 }
@@ -198,7 +312,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   badge: {
-    marginTop: 12,
+    marginTop: 10,
     backgroundColor: '#222',
     paddingHorizontal: 16,
     paddingVertical: 6,
@@ -210,6 +324,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#ecf0f1',
     fontWeight: '600',
+  },
+  statsText: {
+    color: '#7f8fa6',
+    fontSize: 12,
+    marginTop: 6,
   },
   // Partida guardada
   savedContainer: {
@@ -281,5 +400,70 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#dcdde1',
     lineHeight: 18,
+  },
+  // Modal de Dificultades
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  difficultyCard: {
+    width: '88%',
+    backgroundColor: '#1a1a24',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1.5,
+    borderColor: '#d3a625',
+    shadowColor: '#d3a625',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2b2b3d',
+    paddingBottom: 8,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#d3a625',
+  },
+  closeBtn: {
+    padding: 6,
+  },
+  closeBtnText: {
+    color: '#a4b0be',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  difficultyList: {
+    gap: 10,
+  },
+  diffItem: {
+    backgroundColor: '#252634',
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#383a4d',
+  },
+  magnusItem: {
+    borderColor: '#d3a625',
+    backgroundColor: '#2b271d',
+  },
+  diffTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  diffDesc: {
+    fontSize: 12,
+    color: '#ced6e0',
   },
 });

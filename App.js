@@ -24,8 +24,8 @@ export default function App() {
           }}
         >
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Gran Comedor', headerBackVisible: false }} />
-          <Stack.Screen name="Game" component={GameScreen} options={{ title: 'Tablero' }} />
+          <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Sala Principal', headerBackVisible: false }} />
+          <Stack.Screen name="Game" component={GameScreen} options={{ headerShown: false }} />
         </Stack.Navigator>
       </NavigationContainer>
     </GestureHandlerRootView>

@@ -7,6 +7,7 @@ import {
   ScrollView,
   Alert,
   Modal,
+  Image,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { getSavedGame, clearSavedGame, getPlayerStats } from '../utils/gameStorage';
@@ -123,65 +124,78 @@ export default function HomeScreen({ navigation }) {
     {
       id: 'local',
       title: '⚔️ Duelo Local (1 vs 1)',
-      desc: 'Dos magos frente a frente en el mismo tablero.',
-      color: '#2a623d', // Slytherin Green
-      border: '#5d8a68',
+      desc: 'Dos jugadores frente a frente en el mismo tablero.',
+      color: '#1b3a27',
+      border: '#2a623d',
       action: () => navigation.navigate('Game', { mode: 'local' }),
     },
     {
       id: 'bot',
       title: '🤖 Contra la Máquina',
-      desc: 'Elige tu nivel: Normal, Medio, Difícil, Adaptada o Magnus.',
-      color: '#0e1a40', // Ravenclaw Blue
-      border: '#4a69bd',
+      desc: 'Elige tu rival: Normal, Medio, Difícil, Adaptada o Magnus.',
+      color: '#0e1d3a',
+      border: '#20407a',
       action: () => setDifficultyModalVisible(true),
     },
     {
       id: 'timer_3',
       title: '⏳ Contrarreloj (3 Minutos)',
-      desc: 'Partida Blitz rápida con reloj de ajedrez.',
-      color: '#740001', // Gryffindor Red
-      border: '#b83b3e',
+      desc: 'Partida Blitz rápida con reloj digital de ajedrez.',
+      color: '#420d11',
+      border: '#740001',
       action: () => navigation.navigate('Game', { mode: 'timer', timeLimit: 180 }),
     },
     {
       id: 'timer_5',
       title: '⏳ Contrarreloj (5 Minutos)',
-      desc: 'Tiempo estándar para duelos de alta tensión.',
-      color: '#5c1b24',
-      border: '#a34855',
+      desc: 'Tiempo clásico para duelos de alta concentración.',
+      color: '#381318',
+      border: '#6b1923',
       action: () => navigation.navigate('Game', { mode: 'timer', timeLimit: 300 }),
     },
     {
       id: 'sudden_death',
       title: '⚡ Muerte Súbita (15 seg/turno)',
-      desc: '¡Mueve antes de que se agoten los 15 segundos o pierdes!',
-      color: '#d3a625', // Gold
-      textColor: '#1a1a1a',
-      border: '#f5cd79',
+      desc: '¡Mueve antes de que se agoten los 15s por jugada o pierdes!',
+      color: '#3d3010',
+      textColor: '#ffd32a',
+      border: '#d3a625',
       action: () => navigation.navigate('Game', { mode: 'sudden_death', turnLimit: 15 }),
     },
     {
       id: 'online',
       title: '🌐 Duelo Online',
       desc: 'Juega a distancia con amigos (Próximamente).',
-      color: '#222f3e',
-      border: '#576574',
+      color: '#1e222b',
+      border: '#3c4354',
       action: () => navigation.navigate('Game', { mode: 'online' }),
     },
   ];
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer} style={styles.container}>
+      {/* Cabecera con Logo de Caballo e Identidad Jake-Mate */}
       <View style={styles.header}>
-        <Text style={styles.title}>Sala Principal</Text>
-        <Text style={styles.subtitle}>Duelos Mágicos de Ajedrez</Text>
-        <View style={styles.badge}>
-          <Text style={styles.rank}>🧙‍♂️ Rango: Aprendiz Muggle</Text>
+        <View style={styles.logoRing}>
+          <Image
+            source={require('../../assets/icon.png')}
+            style={styles.logoImage}
+            resizeMode="cover"
+          />
         </View>
-        <Text style={styles.statsText}>
-          Record vs IA: {stats.wins}V - {stats.losses}D {stats.draws > 0 ? `(${stats.draws}E)` : ''}
-        </Text>
+        <Text style={styles.title}>JAKE-MATE</Text>
+        <Text style={styles.subtitle}>Ajedrez Táctico & Mágico</Text>
+
+        <View style={styles.badgeRow}>
+          <View style={styles.badge}>
+            <Text style={styles.rank}>🏆 Rango: Gran Maestro</Text>
+          </View>
+          <View style={styles.statsBadge}>
+            <Text style={styles.statsText}>
+              Record IA: {stats.wins}V - {stats.losses}D {stats.draws > 0 ? `(${stats.draws}E)` : ''}
+            </Text>
+          </View>
+        </View>
       </View>
 
       {/* Tarjeta de Partida Guardada (si existe) */}
@@ -201,7 +215,10 @@ export default function HomeScreen({ navigation }) {
             }
           >
             <View style={styles.savedCardHeader}>
-              <Text style={styles.savedTitle}>📂 Continuar Partida</Text>
+              <View style={styles.savedTitleRow}>
+                <Text style={styles.savedIcon}>📂</Text>
+                <Text style={styles.savedTitle}>Continuar Partida</Text>
+              </View>
               <TouchableOpacity onPress={handleDeleteSavedGame} style={styles.deleteButton}>
                 <Text style={styles.deleteText}>✕</Text>
               </TouchableOpacity>
@@ -210,12 +227,12 @@ export default function HomeScreen({ navigation }) {
               Modo: {getModeLabel(savedGame.mode, savedGame.difficulty)} • Turno:{' '}
               {savedGame.currentTurn === 'w' ? '⚪ Blancas' : '⚫ Negras'}
             </Text>
-            <Text style={styles.savedTime}>Guardada en este dispositivo</Text>
+            <Text style={styles.savedTime}>Guardada en tu teléfono</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* Modos de Juego */}
+      {/* Selector de Modos de Juego */}
       <View style={styles.modesContainer}>
         {gameModes.map((item) => (
           <TouchableOpacity
@@ -230,7 +247,7 @@ export default function HomeScreen({ navigation }) {
             <Text style={[styles.cardTitle, item.textColor ? { color: item.textColor } : null]}>
               {item.title}
             </Text>
-            <Text style={[styles.cardDesc, item.textColor ? { color: '#333' } : null]}>
+            <Text style={[styles.cardDesc, item.textColor ? { color: '#e0c068' } : null]}>
               {item.desc}
             </Text>
           </TouchableOpacity>
@@ -251,7 +268,7 @@ export default function HomeScreen({ navigation }) {
         >
           <View style={styles.difficultyCard} onStartShouldSetResponder={() => true}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Dificultad del Oponente</Text>
+              <Text style={styles.modalTitle}>Dificultad de la IA</Text>
               <TouchableOpacity
                 onPress={() => setDifficultyModalVisible(false)}
                 style={styles.closeBtn}
@@ -288,47 +305,84 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: '#0c0d12',
   },
   scrollContainer: {
     paddingHorizontal: 20,
-    paddingTop: 50,
+    paddingTop: 45,
     paddingBottom: 40,
     alignItems: 'center',
   },
   header: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
+  },
+  logoRing: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    borderWidth: 2.5,
+    borderColor: '#d3a625',
+    overflow: 'hidden',
+    shadowColor: '#d3a625',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 14,
+    elevation: 8,
+    marginBottom: 14,
+    backgroundColor: '#161722',
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#d3a625', // Gryffindor Gold
-    letterSpacing: 1,
+    fontSize: 34,
+    fontWeight: '900',
+    color: '#d3a625',
+    letterSpacing: 3,
+    textShadowColor: 'rgba(211, 166, 37, 0.4)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
   },
   subtitle: {
-    fontSize: 15,
-    color: '#a4b0be',
-    marginTop: 4,
+    fontSize: 14,
+    color: '#8e99a8',
+    marginTop: 3,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 14,
   },
   badge: {
-    marginTop: 10,
-    backgroundColor: '#222',
-    paddingHorizontal: 16,
+    backgroundColor: '#191b24',
+    paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#444',
+    borderColor: '#d3a625',
   },
   rank: {
-    fontSize: 14,
-    color: '#ecf0f1',
-    fontWeight: '600',
+    fontSize: 13,
+    color: '#f5cd79',
+    fontWeight: 'bold',
+  },
+  statsBadge: {
+    backgroundColor: '#15161f',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#303446',
   },
   statsText: {
-    color: '#7f8fa6',
+    color: '#a4b0be',
     fontSize: 12,
-    marginTop: 6,
+    fontWeight: '600',
   },
   // Partida guardada
   savedContainer: {
@@ -336,7 +390,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   savedCard: {
-    backgroundColor: '#1e272e',
+    backgroundColor: '#151720',
     borderColor: '#d3a625',
     borderWidth: 2,
     borderRadius: 14,
@@ -352,6 +406,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 6,
+  },
+  savedTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  savedIcon: {
+    fontSize: 18,
   },
   savedTitle: {
     fontSize: 18,
@@ -372,17 +434,17 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   savedTime: {
-    color: '#a4b0be',
+    color: '#8e99a8',
     fontSize: 12,
   },
   modesContainer: {
     width: '100%',
-    gap: 14,
+    gap: 12,
   },
   modeCard: {
     width: '100%',
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1.5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
@@ -391,14 +453,14 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: 'bold',
     color: '#ffffff',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   cardDesc: {
     fontSize: 13,
-    color: '#dcdde1',
+    color: '#cbd1db',
     lineHeight: 18,
   },
   // Modal de Dificultades
@@ -410,15 +472,15 @@ const styles = StyleSheet.create({
   },
   difficultyCard: {
     width: '88%',
-    backgroundColor: '#1a1a24',
-    borderRadius: 16,
+    backgroundColor: '#151722',
+    borderRadius: 18,
     padding: 20,
-    borderWidth: 1.5,
+    borderWidth: 1.8,
     borderColor: '#d3a625',
     shadowColor: '#d3a625',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
-    shadowRadius: 10,
+    shadowRadius: 12,
     elevation: 10,
   },
   modalHeader: {
@@ -427,8 +489,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#2b2b3d',
-    paddingBottom: 8,
+    borderBottomColor: '#2b2e40',
+    paddingBottom: 10,
   },
   modalTitle: {
     fontSize: 20,
@@ -447,15 +509,15 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   diffItem: {
-    backgroundColor: '#252634',
-    borderRadius: 10,
+    backgroundColor: '#202231',
+    borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#383a4d',
+    borderColor: '#34384e',
   },
   magnusItem: {
     borderColor: '#d3a625',
-    backgroundColor: '#2b271d',
+    backgroundColor: '#28241b',
   },
   diffTitle: {
     fontSize: 16,

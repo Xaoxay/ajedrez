@@ -69,7 +69,7 @@ export default function Chessboard3D({ fen, onMove, flipped = false, gestureEnab
   let height = window.innerHeight;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0f0f14);
+  scene.background = new THREE.Color(0x10233d);
 
   const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
@@ -82,30 +82,30 @@ export default function Chessboard3D({ fen, onMove, flipped = false, gestureEnab
   const rig = new THREE.Group();
   scene.add(rig);
 
-  // Luces mágicas estilo Gran Comedor
-  const ambientLight = new THREE.AmbientLight(0xfff3e0, 0.7);
+  // Iluminación cálida con el Sol de Mayo
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
   scene.add(ambientLight);
 
-  const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+  const dirLight = new THREE.DirectionalLight(0xfff3e0, 0.95);
   dirLight.position.set(6, 12, 8);
   dirLight.castShadow = true;
   dirLight.shadow.mapSize.width = 1024;
   dirLight.shadow.mapSize.height = 1024;
   scene.add(dirLight);
 
-  // Luz dorada cálida secundaria
-  const warmLight = new THREE.PointLight(0xd3a625, 0.6, 20);
+  // Luz dorada secundaria del Sol
+  const warmLight = new THREE.PointLight(0xf1c40f, 0.6, 20);
   warmLight.position.set(-6, 8, -6);
   scene.add(warmLight);
 
-  // Materiales de mármol y piedra de Hogwarts
-  const lightSquareMat = new THREE.MeshStandardMaterial({ color: 0xdcdde1, roughness: 0.4 });
-  const darkSquareMat = new THREE.MeshStandardMaterial({ color: 0x2f3640, roughness: 0.5 });
-  const boardBorderMat = new THREE.MeshStandardMaterial({ color: 0x1e272e, roughness: 0.6, metalness: 0.2 });
+  // Materiales de mármol blanco y celeste argentino
+  const lightSquareMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+  const darkSquareMat = new THREE.MeshStandardMaterial({ color: 0x4592db, roughness: 0.4 });
+  const boardBorderMat = new THREE.MeshStandardMaterial({ color: 0x0c1b30, roughness: 0.5, metalness: 0.3 });
 
-  const whitePieceMat = new THREE.MeshStandardMaterial({ color: 0xf5f6fa, roughness: 0.3, metalness: 0.1 });
+  const whitePieceMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.3, metalness: 0.1 });
   const blackPieceMat = new THREE.MeshStandardMaterial({ color: 0x1e272e, roughness: 0.3, metalness: 0.4 });
-  const selectedPieceMat = new THREE.MeshStandardMaterial({ color: 0xd3a625, roughness: 0.2, emissive: 0x740001 });
+  const selectedPieceMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, roughness: 0.2, emissive: 0xd3a625 });
 
   // Marco exterior del tablero
   const borderGeo = new THREE.BoxGeometry(8.6, 0.3, 8.6);

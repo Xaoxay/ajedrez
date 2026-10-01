@@ -8,11 +8,16 @@ import {
   Modal,
   SafeAreaView,
   StatusBar,
+  Dimensions,
 } from 'react-native';
 import Chessboard from 'react-native-chessboard';
 import Chessboard3D from '../components/Chessboard3D';
 import { getBestMove } from '../utils/chessAi';
 import { saveGameLocally, recordGameResult } from '../utils/gameStorage';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// Board size exactly divisible by 8 for crisp Skia squares
+const BOARD_SIZE = Math.floor(Math.min(SCREEN_WIDTH - 20, 392) / 8) * 8;
 
 // Componente decorativo de la Escarapela Argentina
 const Escarapela = () => (
@@ -384,21 +389,20 @@ export default function GameScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a3b63" />
+      <StatusBar barStyle="light-content" backgroundColor="#0d1e36" />
 
-      {/* Fondo Celeste y Blanco con efecto ondeante */}
-      <View style={styles.flagBackground}>
+      {/* Fondo patriótico albiceleste (renderizado en background sin zIndex negativo) */}
+      <View style={styles.flagBackground} pointerEvents="none">
         <View style={styles.flagTopStripe} />
         <View style={styles.flagMidStripe} />
         <View style={styles.flagBottomStripe} />
-        {/* Sol de Mayo brillante en el fondo superior */}
         <Text style={styles.bgSun}>☀️</Text>
       </View>
 
       {/* Barra Superior */}
       <View style={styles.topBar}>
         <View style={styles.titleContainer}>
-          <Text style={styles.modeTitle}>{getModeTitle()}</Text>
+          <Text style={styles.modeTitle} numberOfLines={1}>{getModeTitle()}</Text>
           <View style={styles.turnBadgeRow}>
             <Text style={styles.turnLabel}>Turno:</Text>
             <View style={[styles.turnDot, { backgroundColor: currentTurn === 'w' ? '#ffffff' : '#222222' }]} />
@@ -417,7 +421,7 @@ export default function GameScreen({ route, navigation }) {
             activeOpacity={0.8}
           >
             <Text style={styles.viewToggleText}>
-              {viewMode === '2d' ? '🧊 Modo 3D' : '♟️ Modo 2D'}
+              {viewMode === '2d' ? '🧊 3D' : '♟️ 2D'}
             </Text>
           </TouchableOpacity>
 
@@ -439,8 +443,8 @@ export default function GameScreen({ route, navigation }) {
             <View style={styles.blackAvatarSphere} />
             <Escarapela />
           </View>
-          <View>
-            <Text style={styles.blackPlayerTitle}>{getOpponentLabel()}</Text>
+          <View style={styles.playerTexts}>
+            <Text style={styles.blackPlayerTitle} numberOfLines={1}>{getOpponentLabel()}</Text>
             {mode === 'timer' && (
               <Text style={styles.clockTextBlack}>⏱️ {formatTime(blackTime)}</Text>
             )}
@@ -470,73 +474,35 @@ export default function GameScreen({ route, navigation }) {
         </View>
       </View>
 
-      {/* CONTENEDOR DEL TABLERO DE AJEDREZ */}
-      <View style={styles.boardFrame}>
-        {/* Coordenadas superiores */}
-        <View style={styles.coordsHorizontal}>
-          {['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((l) => (
-            <Text key={l} style={styles.coordText}>{l}</Text>
-          ))}
+      {/* TABLERO DE AJEDREZ (Marco Dorado & Albiceleste) */}
+      <View style={[styles.boardWrapper, { width: BOARD_SIZE + 6, height: BOARD_SIZE + 6 }]}>
+        <View style={viewMode === '2d' ? styles.visibleBoard : styles.hiddenBoard}>
+          <Chessboard
+            ref={chessboardRef}
+            boardSize={BOARD_SIZE}
+            onMove={handleMove}
+            gestureEnabled={!isGameOver && !(mode === 'bot' && currentTurn === 'b')}
+            flipped={isFlipped}
+            colors={{
+              black: '#4592db', // Celeste argentino vibrante
+              white: '#ffffff', // Mármol blanco
+              lastMoveHighlight: 'rgba(241, 196, 15, 0.45)', // Amarillo dorado suave
+              checkmateHighlight: '#e74c3c',
+              dotColor: 'rgba(243, 156, 18, 0.88)', // Puntos en amarillo dorado brillante
+            }}
+          />
         </View>
 
-        <View style={styles.boardWithVerticalCoords}>
-          {/* Coordenadas verticales izquierda */}
-          <View style={styles.coordsVertical}>
-            {['8', '7', '6', '5', '4', '3', '2', '1'].map((n) => (
-              <Text key={n} style={styles.coordText}>{n}</Text>
-            ))}
+        {viewMode === '3d' && (
+          <View style={styles.visibleBoard}>
+            <Chessboard3D
+              fen={currentFen}
+              onMove={handleMove3D}
+              flipped={isFlipped}
+              gestureEnabled={!isGameOver && !(mode === 'bot' && currentTurn === 'b')}
+            />
           </View>
-
-          {/* El Tablero */}
-          <View style={styles.boardContainer}>
-            <View style={viewMode === '2d' ? styles.visibleBoard : styles.hiddenBoard}>
-              <Chessboard
-                ref={chessboardRef}
-                onMove={handleMove}
-                gestureEnabled={!isGameOver && !(mode === 'bot' && currentTurn === 'b')}
-                flipped={isFlipped}
-                colors={{
-                  black: '#4592db', // Celeste argentino vibrante
-                  white: '#ffffff', // Mármol blanco
-                  lastMoveHighlight: 'rgba(241, 196, 15, 0.45)', // Amarillo dorado suave
-                  checkmateHighlight: '#e74c3c',
-                  dotColor: 'rgba(243, 156, 18, 0.88)', // Puntos en amarillo dorado brillante
-                }}
-              />
-            </View>
-
-            {viewMode === '3d' && (
-              <View style={styles.visibleBoard}>
-                <Chessboard3D
-                  fen={currentFen}
-                  onMove={handleMove3D}
-                  flipped={isFlipped}
-                  gestureEnabled={!isGameOver && !(mode === 'bot' && currentTurn === 'b')}
-                />
-              </View>
-            )}
-          </View>
-
-          {/* Coordenadas verticales derecha */}
-          <View style={styles.coordsVertical}>
-            {['8', '7', '6', '5', '4', '3', '2', '1'].map((n) => (
-              <Text key={n} style={styles.coordText}>{n}</Text>
-            ))}
-          </View>
-        </View>
-
-        {/* Coordenadas inferiores con el Sol de Mayo en el centro */}
-        <View style={styles.coordsHorizontalBottom}>
-          <Text style={styles.coordText}>a</Text>
-          <Text style={styles.coordText}>b</Text>
-          <Text style={styles.coordText}>c</Text>
-          <Text style={styles.coordText}>d</Text>
-          <Text style={styles.sunSymbol}>☀️</Text>
-          <Text style={styles.coordText}>e</Text>
-          <Text style={styles.coordText}>f</Text>
-          <Text style={styles.coordText}>g</Text>
-          <Text style={styles.coordText}>h</Text>
-        </View>
+        )}
       </View>
 
       {/* TARJETA INFERIOR (JUGADOR BLANCAS) */}
@@ -547,8 +513,8 @@ export default function GameScreen({ route, navigation }) {
             <View style={styles.whiteAvatarSphere} />
             <Escarapela />
           </View>
-          <View>
-            <Text style={styles.whitePlayerTitle}>
+          <View style={styles.playerTexts}>
+            <Text style={styles.whitePlayerTitle} numberOfLines={1}>
               {mode === 'bot' ? '🧙‍♂️ Tú (Blancas)' : 'Jugador Blancas'}
             </Text>
             {mode === 'timer' && (
@@ -690,34 +656,37 @@ export default function GameScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#163359',
+    backgroundColor: '#0c1b30',
     justifyContent: 'space-between',
-    paddingVertical: 10,
+    paddingVertical: 12,
     alignItems: 'center',
   },
   // Fondo ondeante celeste y blanco
   flagBackground: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: -1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   flagTopStripe: {
     flex: 1.2,
-    backgroundColor: '#1b4b82',
+    backgroundColor: '#0f2442',
   },
   flagMidStripe: {
-    flex: 1,
-    backgroundColor: '#ffffff',
+    flex: 0.9,
+    backgroundColor: '#163359',
   },
   flagBottomStripe: {
     flex: 1.2,
-    backgroundColor: '#1b4b82',
+    backgroundColor: '#0f2442',
   },
   bgSun: {
     position: 'absolute',
     top: 25,
-    right: 30,
-    fontSize: 70,
-    opacity: 0.35,
+    right: 25,
+    fontSize: 64,
+    opacity: 0.25,
   },
   // Barra Superior
   topBar: {
@@ -725,24 +694,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 6,
+    paddingVertical: 4,
   },
   titleContainer: {
     flex: 1,
+    marginRight: 8,
   },
   modeTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
     color: '#ffffff',
-    textShadowColor: 'rgba(0, 0, 0, 0.4)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
   },
   turnBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginTop: 3,
+    marginTop: 2,
   },
   turnLabel: {
     fontSize: 13,
@@ -764,24 +731,19 @@ const styles = StyleSheet.create({
   topActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   viewToggleButton: {
     backgroundColor: '#153966',
     borderWidth: 1.5,
     borderColor: '#4ab2f1',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 22,
-    shadowColor: '#4ab2f1',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
-    elevation: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 18,
   },
   viewToggleActive: {
     backgroundColor: '#d3a625',
-    borderColor: '#fff',
+    borderColor: '#ffffff',
   },
   viewToggleText: {
     color: '#ffffff',
@@ -789,22 +751,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   settingsCircleButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#133561',
     borderWidth: 1.5,
     borderColor: '#d3a625',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
   },
   settingsIconText: {
-    fontSize: 18,
+    fontSize: 16,
   },
   // Tarjetas de Jugadores (Cápsulas)
   playerCard: {
@@ -814,14 +771,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 30,
+    borderRadius: 24,
     borderWidth: 2,
     borderColor: '#d3a625',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.4,
     shadowRadius: 6,
-    elevation: 5,
+    elevation: 4,
   },
   playerCardBlack: {
     backgroundColor: '#0c1b30',
@@ -831,7 +788,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#122542',
   },
   playerCardWhite: {
-    backgroundColor: '#fbfcfd',
+    backgroundColor: '#f8fafc',
   },
   activeCardWhite: {
     borderColor: '#ffd32a',
@@ -844,26 +801,29 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   avatarWrapper: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
   blackAvatarSphere: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: '#181a20',
     borderWidth: 2,
     borderColor: '#d3a625',
   },
   whiteAvatarSphere: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: '#f1f5f9',
     borderWidth: 2,
     borderColor: '#d3a625',
+  },
+  playerTexts: {
+    flex: 1,
   },
   // Escarapela
   escarapelaWrap: {
@@ -873,9 +833,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   escarapelaOuter: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 15,
+    height: 15,
+    borderRadius: 7.5,
     backgroundColor: '#4a90e2',
     justifyContent: 'center',
     alignItems: 'center',
@@ -883,17 +843,17 @@ const styles = StyleSheet.create({
     borderColor: '#fff',
   },
   escarapelaMid: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
     backgroundColor: '#ffffff',
     justifyContent: 'center',
     alignItems: 'center',
   },
   escarapelaInner: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
     backgroundColor: '#4a90e2',
   },
   ribbonContainer: {
@@ -903,7 +863,7 @@ const styles = StyleSheet.create({
   },
   ribbon: {
     width: 3,
-    height: 6,
+    height: 5,
     backgroundColor: '#4a90e2',
     borderRadius: 1,
   },
@@ -915,130 +875,90 @@ const styles = StyleSheet.create({
   },
   blackPlayerTitle: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
   },
   whitePlayerTitle: {
-    color: '#1a202c',
-    fontSize: 16,
+    color: '#0f172a',
+    fontSize: 15,
     fontWeight: 'bold',
   },
   clockTextBlack: {
     color: '#f5cd79',
     fontSize: 12,
     fontWeight: 'bold',
-    marginTop: 2,
+    marginTop: 1,
   },
   clockTextWhite: {
     color: '#1a3b63',
     fontSize: 12,
     fontWeight: 'bold',
-    marginTop: 2,
+    marginTop: 1,
   },
   suddenDeathText: {
     color: '#ff4757',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 'bold',
   },
   // Botones de acción en la tarjeta
   actionButtonsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   tablasButtonBlack: {
     backgroundColor: '#183863',
     borderWidth: 1.5,
     borderColor: '#4ab2f1',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   tablasButtonTextBlack: {
     color: '#ffffff',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
   },
   tablasButtonWhite: {
     backgroundColor: '#edf5fd',
     borderWidth: 1.5,
     borderColor: '#3b82f6',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   tablasButtonTextWhite: {
     color: '#1e3a8a',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
   },
   rendirmeButton: {
     backgroundColor: '#a81c24',
     borderWidth: 1.5,
     borderColor: '#f87171',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   rendirmeButtonText: {
     color: '#ffffff',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
   },
-  // Marco del Tablero con Coordenadas y Sol de Mayo
-  boardFrame: {
-    width: '94%',
-    backgroundColor: '#12253f',
-    borderRadius: 16,
-    borderWidth: 2.5,
+  // Marco del Tablero de Ajedrez
+  boardWrapper: {
+    borderRadius: 12,
+    borderWidth: 3,
     borderColor: '#d3a625',
-    padding: 6,
+    overflow: 'hidden',
+    backgroundColor: '#12253f',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 10,
+    shadowRadius: 10,
+    elevation: 8,
+    justifyContent: 'center',
     alignItems: 'center',
-  },
-  coordsHorizontal: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '88%',
-    paddingBottom: 4,
-  },
-  coordsHorizontalBottom: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    width: '88%',
-    paddingTop: 4,
-  },
-  coordText: {
-    color: '#d3a625',
-    fontSize: 11,
-    fontWeight: 'bold',
-    width: 20,
-    textAlign: 'center',
-  },
-  sunSymbol: {
-    fontSize: 14,
-    color: '#f1c40f',
-  },
-  boardWithVerticalCoords: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-  },
-  coordsVertical: {
-    justifyContent: 'space-around',
-    height: '92%',
-    paddingHorizontal: 4,
-  },
-  boardContainer: {
-    flex: 1,
-    aspectRatio: 1,
-    borderRadius: 6,
-    overflow: 'hidden',
   },
   visibleBoard: {
     width: '100%',
@@ -1080,9 +1000,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#ffffff',
     letterSpacing: 1,
-    textShadowColor: 'rgba(211, 166, 37, 0.5)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
     marginBottom: 8,
   },
   endGameSubtitle: {
@@ -1102,10 +1019,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 16,
     alignItems: 'center',
-    shadowColor: '#d3a625',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
     elevation: 4,
   },
   revanchaButtonText: {

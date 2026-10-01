@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import GameScreen from './src/screens/GameScreen';
+import ErrorBoundary from './src/components/ErrorBoundary';
 
 const Stack = createNativeStackNavigator();
 
@@ -15,20 +16,22 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
-      <NavigationContainer>
-        <Stack.Navigator 
-          initialRouteName="Login"
-          screenOptions={{
-            headerStyle: { backgroundColor: '#1a1a1a' },
-            headerTintColor: '#d3a625',
-          }}
-        >
-          <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="Game" component={GameScreen} options={{ headerShown: false }} />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </GestureHandlerRootView>
+        <ErrorBoundary>
+          <NavigationContainer>
+            <Stack.Navigator 
+              initialRouteName="Login"
+              screenOptions={{
+                headerStyle: { backgroundColor: '#1a1a1a' },
+                headerTintColor: '#d3a625',
+              }}
+            >
+              <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+              <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
+              <Stack.Screen name="Game" component={GameScreen} options={{ headerShown: false }} />
+            </Stack.Navigator>
+          </NavigationContainer>
+        </ErrorBoundary>
+      </GestureHandlerRootView>
     </SafeAreaProvider>
   );
 }

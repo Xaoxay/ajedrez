@@ -10,6 +10,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -38,8 +40,16 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease
 
-      - name: Upload APK
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Ajedrez-APK
           path: android/app/build/outputs/apk/release/app-release.apk
+
+      - name: Publish Direct APK to GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/master'
+        with:
+          tag_name: v1.0.0
+          name: "Jake-Mate (Edición Patria Albiceleste)"
+          files: android/app/build/outputs/apk/release/app-release.apk

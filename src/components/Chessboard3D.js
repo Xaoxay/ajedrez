@@ -92,8 +92,8 @@ export default function Chessboard3D({
   scene.background = new THREE.Color(0x0c1a2e);
 
   // Cámara con perspectiva amplia para visión tridimensional inmersiva
-  const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
-  camera.position.set(0, 8.2, 7.8);
+  const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
+  camera.position.set(0, 10.5, 9.0); // Cámara más alta para mejor vista
   camera.lookAt(0, 0, 0);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
@@ -108,11 +108,11 @@ export default function Chessboard3D({
   scene.add(rig);
 
   // Iluminación ambiental y solar estilo Sol de Mayo
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.82);
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.85); // Luz general más suave
   scene.add(ambientLight);
 
-  const sunDirLight = new THREE.DirectionalLight(0xfff5e6, 0.95);
-  sunDirLight.position.set(5, 14, 7);
+  const sunDirLight = new THREE.DirectionalLight(0xfff5e6, 0.85); // Reducido para evitar quemar blancos
+  sunDirLight.position.set(4, 12, 6);
   sunDirLight.castShadow = true;
   sunDirLight.shadow.mapSize.width = 1024;
   sunDirLight.shadow.mapSize.height = 1024;
@@ -120,7 +120,7 @@ export default function Chessboard3D({
   scene.add(sunDirLight);
 
   // Luz dorada secundaria de relleno
-  const goldLight = new THREE.PointLight(0xf5cd79, 0.65, 25);
+  const goldLight = new THREE.PointLight(0xf5cd79, 0.35, 25); // Bajada la intensidad drásticamente
   goldLight.position.set(-6, 9, -5);
   scene.add(goldLight);
 
@@ -400,7 +400,7 @@ export default function Chessboard3D({
 
   // Ángulos objetivos para la auto-inclinación suave
   let targetRigRotationY = 0;
-  let targetRigRotationX = -0.58;
+  let targetRigRotationX = -0.95; // Inclinación mayor para vista top-down
 
   function updateTargetTilt() {
     if (!autoRotateEnabled) return;
@@ -411,10 +411,10 @@ export default function Chessboard3D({
 
     if (facingWhite) {
       targetRigRotationY = 0;
-      targetRigRotationX = -0.58;
+      targetRigRotationX = -0.95;
     } else {
       targetRigRotationY = Math.PI;
-      targetRigRotationX = -0.58;
+      targetRigRotationX = -0.95;
     }
   }
 
@@ -544,6 +544,23 @@ export default function Chessboard3D({
 
   window.addEventListener('message', (e) => handleIncomingMessage(e.data));
   document.addEventListener('message', (e) => handleIncomingMessage(e.data));
+
+  // --- CARGA INICIAL INSTANTÁNEA ---
+  // Inyectamos las variables directamente desde React para que el tablero no se vea vacío 
+  // en el primer render mientras espera el mensaje 'SYNC_STATE'.
+  const initialFen = "${fen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'}";
+  const initialTurn = "${turn || 'w'}";
+  const initialFlipped = ${flipped ? 'true' : 'false'};
+  
+  loadFen(initialFen);
+  currentTurnState = initialTurn;
+  isFlippedState = initialFlipped;
+  updateTargetTilt();
+  
+  // Establecemos el ángulo instantáneamente para que no tenga que animarse desde 0 al inicio
+  rig.rotation.y = targetRigRotationY;
+  rig.rotation.x = targetRigRotationX;
+  // ---------------------------------
 
   // Ciclo de animación continua con rotación suave (Lerp)
   function animate() {

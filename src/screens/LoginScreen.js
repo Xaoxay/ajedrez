@@ -1,9 +1,22 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, StatusBar } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function LoginScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingTop: Math.max(insets.top + 20, 30),
+          paddingBottom: Math.max(insets.bottom + 20, 30),
+          paddingLeft: Math.max(insets.left + 20, 24),
+          paddingRight: Math.max(insets.right + 20, 24),
+        },
+      ]}
+    >
+      <StatusBar barStyle="light-content" backgroundColor="#0c0d12" />
       <View style={styles.logoContainer}>
         <Image
           source={require('../../assets/icon.png')}

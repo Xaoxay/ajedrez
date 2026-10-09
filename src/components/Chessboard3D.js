@@ -1,19 +1,31 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { WebView } from 'react-native-webview';
 
-export default function Chessboard3D({ fen, onMove, flipped = false, gestureEnabled = true }) {
+export default function Chessboard3D({
+  fen,
+  onMove,
+  turn = 'w',
+  flipped = false,
+  gestureEnabled = true,
+}) {
   const webViewRef = useRef(null);
+  const [autoRotate, setAutoRotate] = useState(true);
 
-  // Enviar nuevo FEN al WebView cada vez que cambia el estado
+  // Sincronizar FEN, turno y modo volteado con la escena Three.js
   useEffect(() => {
     if (fen && webViewRef.current) {
-      const msg = JSON.stringify({ type: 'SET_FEN', fen, flipped });
+      const msg = JSON.stringify({
+        type: 'SYNC_STATE',
+        fen,
+        turn,
+        flipped,
+        autoRotate,
+      });
       webViewRef.current.postMessage(msg);
     }
-  }, [fen, flipped]);
+  }, [fen, turn, flipped, autoRotate]);
 
-  // Manejar mensajes recibidos desde el WebView (jugada del usuario)
   const handleMessage = (event) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
@@ -21,13 +33,21 @@ export default function Chessboard3D({ fen, onMove, flipped = false, gestureEnab
         onMove({ from: data.from, to: data.to });
       }
     } catch (e) {
-      console.error('Error procesando mensaje 3D:', e);
+      console.error('Error procesando jugada 3D:', e);
+    }
+  };
+
+  const toggleAutoRotate = () => {
+    const nextVal = !autoRotate;
+    setAutoRotate(nextVal);
+    if (webViewRef.current) {
+      webViewRef.current.postMessage(JSON.stringify({ type: 'SET_AUTO_ROTATE', value: nextVal }));
     }
   };
 
   const resetCamera = () => {
     if (webViewRef.current) {
-      webViewRef.current.postMessage(JSON.stringify({ type: 'RESET_CAMERA' }));
+      webViewRef.current.postMessage(JSON.stringify({ type: 'RESET_CAMERA', turn, flipped }));
     }
   };
 
@@ -37,12 +57,12 @@ export default function Chessboard3D({ fen, onMove, flipped = false, gestureEnab
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Tablero 3D Harry Potter</title>
+<title>Tablero 3D Jake-Mate</title>
 <style>
   html, body {
     margin: 0;
     padding: 0;
-    background: #0f0f14;
+    background: #0c1a2e;
     height: 100%;
     width: 100%;
     overflow: hidden;
@@ -69,50 +89,91 @@ export default function Chessboard3D({ fen, onMove, flipped = false, gestureEnab
   let height = window.innerHeight;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x10233d);
+  scene.background = new THREE.Color(0x0c1a2e);
 
-  const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  // Cámara con perspectiva amplia para visión tridimensional inmersiva
+  const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
+  camera.position.set(0, 8.2, 7.8);
+  camera.lookAt(0, 0, 0);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
   renderer.setSize(width, height);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   container.appendChild(renderer.domElement);
 
+  // Rig contenedor del tablero para rotación suave e inclinación por turno
   const rig = new THREE.Group();
   scene.add(rig);
 
-  // Iluminación cálida con el Sol de Mayo
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+  // Iluminación ambiental y solar estilo Sol de Mayo
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.82);
   scene.add(ambientLight);
 
-  const dirLight = new THREE.DirectionalLight(0xfff3e0, 0.95);
-  dirLight.position.set(6, 12, 8);
-  dirLight.castShadow = true;
-  dirLight.shadow.mapSize.width = 1024;
-  dirLight.shadow.mapSize.height = 1024;
-  scene.add(dirLight);
+  const sunDirLight = new THREE.DirectionalLight(0xfff5e6, 0.95);
+  sunDirLight.position.set(5, 14, 7);
+  sunDirLight.castShadow = true;
+  sunDirLight.shadow.mapSize.width = 1024;
+  sunDirLight.shadow.mapSize.height = 1024;
+  sunDirLight.shadow.bias = -0.001;
+  scene.add(sunDirLight);
 
-  // Luz dorada secundaria del Sol
-  const warmLight = new THREE.PointLight(0xf1c40f, 0.6, 20);
-  warmLight.position.set(-6, 8, -6);
-  scene.add(warmLight);
+  // Luz dorada secundaria de relleno
+  const goldLight = new THREE.PointLight(0xf5cd79, 0.65, 25);
+  goldLight.position.set(-6, 9, -5);
+  scene.add(goldLight);
 
-  // Materiales de mármol blanco y celeste argentino
-  const lightSquareMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
-  const darkSquareMat = new THREE.MeshStandardMaterial({ color: 0x4592db, roughness: 0.4 });
-  const boardBorderMat = new THREE.MeshStandardMaterial({ color: 0x0c1b30, roughness: 0.5, metalness: 0.3 });
+  // Materiales PBR para mármol blanco, celeste argentino y marco dorado
+  const lightSquareMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.28,
+    metalness: 0.08
+  });
+  const darkSquareMat = new THREE.MeshStandardMaterial({
+    color: 0x4592db,
+    roughness: 0.32,
+    metalness: 0.12
+  });
+  const highlightMat = new THREE.MeshStandardMaterial({
+    color: 0xf1c40f,
+    emissive: 0xd3a625,
+    emissiveIntensity: 0.55,
+    roughness: 0.2
+  });
+  const boardBorderMat = new THREE.MeshStandardMaterial({
+    color: 0x0e2038,
+    roughness: 0.4,
+    metalness: 0.4
+  });
+  const goldTrimMat = new THREE.MeshStandardMaterial({
+    color: 0xd3a625,
+    roughness: 0.25,
+    metalness: 0.8
+  });
 
-  const whitePieceMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.3, metalness: 0.1 });
-  const blackPieceMat = new THREE.MeshStandardMaterial({ color: 0x1e272e, roughness: 0.3, metalness: 0.4 });
-  const selectedPieceMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, roughness: 0.2, emissive: 0xd3a625 });
+  // Materiales de piezas: Marfil albiceleste y Obsidiana noche
+  const whitePieceMat = new THREE.MeshStandardMaterial({
+    color: 0xf7fafc,
+    roughness: 0.22,
+    metalness: 0.18
+  });
+  const blackPieceMat = new THREE.MeshStandardMaterial({
+    color: 0x162233,
+    roughness: 0.28,
+    metalness: 0.35
+  });
 
-  // Marco exterior del tablero
-  const borderGeo = new THREE.BoxGeometry(8.6, 0.3, 8.6);
-  const borderMesh = new THREE.Mesh(borderGeo, boardBorderMat);
-  borderMesh.position.y = -0.16;
-  borderMesh.receiveShadow = true;
-  rig.add(borderMesh);
+  // Base y marco exterior del tablero
+  const baseBox = new THREE.Mesh(new THREE.BoxGeometry(8.9, 0.4, 8.9), boardBorderMat);
+  baseBox.position.y = -0.21;
+  baseBox.receiveShadow = true;
+  rig.add(baseBox);
+
+  // Ribete dorado decorativo
+  const trimBox = new THREE.Mesh(new THREE.BoxGeometry(8.94, 0.06, 8.94), goldTrimMat);
+  trimBox.position.y = -0.02;
+  rig.add(trimBox);
 
   // Cuadrícula 8x8 de casillas
   const squareMeshes = [];
@@ -121,76 +182,193 @@ export default function Chessboard3D({ fen, onMove, flipped = false, gestureEnab
 
   for (let r = 0; r < 8; r++) {
     for (let c = 0; c < 8; c++) {
-      const geo = new THREE.BoxGeometry(1, 0.2, 1);
+      const geo = new THREE.BoxGeometry(1.0, 0.18, 1.0);
       const isLight = (r + c) % 2 === 0;
-      const mat = (isLight ? lightSquareMat : darkSquareMat).clone();
-      const square = new THREE.Mesh(geo, mat);
+      const square = new THREE.Mesh(geo, isLight ? lightSquareMat : darkSquareMat);
       square.position.set(c - 3.5, 0, r - 3.5);
       square.receiveShadow = true;
 
-      const squareName = files[c] + (8 - r);
-      square.userData = { square: squareName, defaultColor: isLight ? 0xdcdde1 : 0x2f3640 };
+      const sqName = files[c] + (8 - r);
+      square.userData = { square: sqName, isLight };
       squaresGroup.add(square);
       squareMeshes.push(square);
     }
   }
   rig.add(squaresGroup);
 
-  // Grupo contenedor de piezas 3D
+  // Anillos indicadores de casilla seleccionada
+  const selectRingGeo = new THREE.RingGeometry(0.32, 0.46, 24);
+  selectRingGeo.rotateX(-Math.PI / 2);
+  const selectRing = new THREE.Mesh(selectRingGeo, new THREE.MeshBasicMaterial({ color: 0xf1c40f, side: THREE.DoubleSide }));
+  selectRing.position.y = 0.11;
+  selectRing.visible = false;
+  rig.add(selectRing);
+
+  // Grupo de piezas 3D
   const piecesGroup = new THREE.Group();
   rig.add(piecesGroup);
 
-  // Constructor procedural de piezas 3D
-  function createPieceMesh(type, isWhite) {
+  // Constructor procedural de piezas Staunton 3D realistas
+  function createStauntonPiece(type, isWhite) {
     const mat = isWhite ? whitePieceMat : blackPieceMat;
     const group = new THREE.Group();
-
-    // Base de la pieza
-    const baseGeo = new THREE.CylinderGeometry(0.28, 0.34, 0.15, 16);
-    const base = new THREE.Mesh(baseGeo, mat);
-    base.position.y = 0.175;
-    base.castShadow = true;
-    base.receiveShadow = true;
-    group.add(base);
-
-    let topMesh;
     const pType = type.toLowerCase();
 
-    if (pType === 'p') {
-      topMesh = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 16), mat);
-      topMesh.position.y = 0.45;
-    } else if (pType === 'r') {
-      topMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.26, 0.45, 8), mat);
-      topMesh.position.y = 0.5;
-    } else if (pType === 'n') {
-      topMesh = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.55, 5), mat);
-      topMesh.position.y = 0.55;
-      topMesh.rotation.y = Math.PI / 4;
-    } else if (pType === 'b') {
-      topMesh = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.6, 16), mat);
-      topMesh.position.y = 0.6;
-    } else if (pType === 'q') {
-      topMesh = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.75, 16), mat);
-      topMesh.position.y = 0.68;
-    } else if (pType === 'k') {
-      topMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.25, 0.75, 16), mat);
-      topMesh.position.y = 0.72;
-      const cross = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.2, 0.06), mat);
-      cross.position.y = 1.15;
-      cross.castShadow = true;
-      group.add(cross);
-    }
+    // 1. Zócalo y base escalonada (Común a todas las piezas)
+    const plinth = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.38, 0.1, 20), mat);
+    plinth.position.y = 0.15;
+    plinth.castShadow = true;
+    plinth.receiveShadow = true;
+    group.add(plinth);
 
-    if (topMesh) {
-      topMesh.castShadow = true;
-      topMesh.receiveShadow = true;
-      group.add(topMesh);
+    const baseFillet = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.32, 0.08, 20), mat);
+    baseFillet.position.y = 0.23;
+    baseFillet.castShadow = true;
+    group.add(baseFillet);
+
+    if (pType === 'p') {
+      // --- PEÓN ---
+      // Cuerpo cónico elegante
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.25, 0.36, 16), mat);
+      body.position.y = 0.44;
+      body.castShadow = true;
+      group.add(body);
+
+      // Cuello
+      const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.05, 16), mat);
+      collar.position.y = 0.63;
+      collar.castShadow = true;
+      group.add(collar);
+
+      // Cabeza esférica
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 16), mat);
+      head.position.y = 0.81;
+      head.castShadow = true;
+      group.add(head);
+
+    } else if (pType === 'r') {
+      // --- TORRE ---
+      // Torre cilíndrica robusta
+      const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.23, 0.27, 0.5, 16), mat);
+      tower.position.y = 0.51;
+      tower.castShadow = true;
+      group.add(tower);
+
+      // Almenas del castillo
+      const parapet = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.24, 0.16, 16), mat);
+      parapet.position.y = 0.81;
+      parapet.castShadow = true;
+      group.add(parapet);
+
+      // Hueco almenado
+      const crenel = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.1, 12), mat);
+      crenel.position.y = 0.86;
+      group.add(crenel);
+
+    } else if (pType === 'n') {
+      // --- CABALLO ---
+      // Pecho y cuello arqueado
+      const chest = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.26, 0.36, 14), mat);
+      chest.position.set(0, 0.43, -0.04);
+      chest.rotation.x = 0.22;
+      chest.castShadow = true;
+      group.add(chest);
+
+      // Cabeza y hocico de caballo esculpido
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.28, 0.38), mat);
+      head.position.set(0, 0.72, 0.06);
+      head.rotation.x = -0.3;
+      head.castShadow = true;
+      group.add(head);
+
+      // Orejas
+      const leftEar = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.14, 6), mat);
+      leftEar.position.set(0.08, 0.94, -0.06);
+      leftEar.rotation.x = -0.2;
+      group.add(leftEar);
+
+      const rightEar = leftEar.clone();
+      rightEar.position.x = -0.08;
+      group.add(rightEar);
+
+    } else if (pType === 'b') {
+      // --- ALFIL ---
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.26, 0.52, 16), mat);
+      body.position.y = 0.52;
+      body.castShadow = true;
+      group.add(body);
+
+      const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.05, 16), mat);
+      collar.position.y = 0.8;
+      group.add(collar);
+
+      // Mitra ovalada
+      const mitre = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 16), mat);
+      mitre.scale.set(1.0, 1.45, 1.0);
+      mitre.position.y = 1.02;
+      mitre.castShadow = true;
+      group.add(mitre);
+
+      // Pomo superior
+      const finial = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 12), mat);
+      finial.position.y = 1.32;
+      group.add(finial);
+
+    } else if (pType === 'q') {
+      // --- REINA ---
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.29, 0.65, 16), mat);
+      body.position.y = 0.58;
+      body.castShadow = true;
+      group.add(body);
+
+      const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.06, 16), mat);
+      collar.position.y = 0.93;
+      group.add(collar);
+
+      // Corona de la reina
+      const coronet = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.16, 0.22, 16), mat);
+      coronet.position.y = 1.06;
+      coronet.castShadow = true;
+      group.add(coronet);
+
+      // Orbe real
+      const orb = new THREE.Mesh(new THREE.SphereGeometry(0.08, 14, 14), mat);
+      orb.position.y = 1.25;
+      group.add(orb);
+
+    } else if (pType === 'k') {
+      // --- REY ---
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.3, 0.72, 16), mat);
+      body.position.y = 0.62;
+      body.castShadow = true;
+      group.add(body);
+
+      const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.06, 16), mat);
+      collar.position.y = 1.02;
+      group.add(collar);
+
+      // Corona imperial
+      const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.2, 0.24, 16), mat);
+      crown.position.y = 1.16;
+      crown.castShadow = true;
+      group.add(crown);
+
+      // Cruz cristiana tridimensional
+      const crossVert = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.22, 0.06), mat);
+      crossVert.position.y = 1.41;
+      crossVert.castShadow = true;
+      group.add(crossVert);
+
+      const crossHoriz = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.06, 0.06), mat);
+      crossHoriz.position.y = 1.43;
+      crossHoriz.castShadow = true;
+      group.add(crossHoriz);
     }
 
     return group;
   }
 
-  // Posicionar piezas según FEN
+  // Carga y posicionamiento del tablero a partir del FEN
   function loadFen(fenString) {
     while (piecesGroup.children.length > 0) {
       piecesGroup.remove(piecesGroup.children[0]);
@@ -204,8 +382,8 @@ export default function Chessboard3D({ fen, onMove, flipped = false, gestureEnab
           c += parseInt(char, 10);
         } else {
           const isWhite = char === char.toUpperCase();
-          const piece = createPieceMesh(char, isWhite);
-          piece.position.set(c - 3.5, 0.1, r - 3.5);
+          const piece = createStauntonPiece(char, isWhite);
+          piece.position.set(c - 3.5, 0, r - 3.5);
           const sqName = files[c] + (8 - r);
           piece.userData = { piece: char, isWhite, square: sqName };
           piecesGroup.add(piece);
@@ -215,12 +393,32 @@ export default function Chessboard3D({ fen, onMove, flipped = false, gestureEnab
     }
   }
 
-  // Cámara inicial
-  camera.position.set(0, 7.5, 7.2);
-  camera.lookAt(0, 0, 0);
-  rig.rotation.x = -0.55;
+  // Variables de control de cámara y auto-inclinación por turno
+  let currentTurnState = 'w';
+  let isFlippedState = false;
+  let autoRotateEnabled = true;
 
-  // Interacción táctil y rotación de cámara
+  // Ángulos objetivos para la auto-inclinación suave
+  let targetRigRotationY = 0;
+  let targetRigRotationX = -0.58;
+
+  function updateTargetTilt() {
+    if (!autoRotateEnabled) return;
+
+    // Si le toca a las Blancas: el tablero se inclina hacia el jugador blanco
+    // Si le toca a las Negras: el tablero gira suavemente 180° hacia el jugador negro
+    const facingWhite = isFlippedState ? currentTurnState === 'b' : currentTurnState === 'w';
+
+    if (facingWhite) {
+      targetRigRotationY = 0;
+      targetRigRotationX = -0.58;
+    } else {
+      targetRigRotationY = Math.PI;
+      targetRigRotationX = -0.58;
+    }
+  }
+
+  // Control táctil de rotación manual
   let isDragging = false;
   let hasMovedMuch = false;
   let startX = 0, startY = 0;
@@ -249,9 +447,9 @@ export default function Chessboard3D({ fen, onMove, flipped = false, gestureEnab
       hasMovedMuch = true;
     }
 
-    rig.rotation.y += dx * 0.008;
-    rig.rotation.x += dy * 0.008;
-    rig.rotation.x = Math.max(-1.1, Math.min(0.1, rig.rotation.x));
+    rig.rotation.y += dx * 0.007;
+    rig.rotation.x += dy * 0.007;
+    rig.rotation.x = Math.max(-1.15, Math.min(0.05, rig.rotation.x));
 
     prevX = e.clientX;
     prevY = e.clientY;
@@ -260,20 +458,19 @@ export default function Chessboard3D({ fen, onMove, flipped = false, gestureEnab
   function onPointerUp(e) {
     isDragging = false;
 
-    // Si fue un toque directo sin arrastrar la cámara: Raycasting para seleccionar o mover
+    // Toque directo sin arrastre: selección o movimiento
     if (!hasMovedMuch) {
       pointer.x = (e.clientX / width) * 2 - 1;
       pointer.y = -(e.clientY / height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
 
-      // 1. Verificar si tocó una casilla
       const squareIntersects = raycaster.intersectObjects(squareMeshes);
       if (squareIntersects.length > 0) {
         const clickedSquare = squareIntersects[0].object.userData.square;
 
         if (selectedSquare) {
           if (selectedSquare !== clickedSquare) {
-            // Notificar intento de jugada a React Native
+            // Enviar jugada al contenedor de React Native
             if (window.ReactNativeWebView) {
               window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'MOVE',
@@ -284,68 +481,89 @@ export default function Chessboard3D({ fen, onMove, flipped = false, gestureEnab
           }
           clearSelection();
         } else {
-          // Buscar si hay una pieza en esa casilla
-          const foundPiece = piecesGroup.children.find(p => p.userData?.square === clickedSquare);
-          if (foundPiece) {
-            selectPiece(foundPiece, clickedSquare);
+          // Buscar pieza en la casilla tocada
+          const piece = piecesGroup.children.find(p => p.userData?.square === clickedSquare);
+          if (piece) {
+            // Verificar si corresponde al turno actual
+            const pieceColor = piece.userData.isWhite ? 'w' : 'b';
+            if (pieceColor === currentTurnState) {
+              selectPiece(piece, clickedSquare);
+            }
           }
         }
+      } else {
+        clearSelection();
       }
     }
   }
 
   function selectPiece(pieceGroup, squareName) {
+    clearSelection();
     selectedSquare = squareName;
     selectedPieceGroup = pieceGroup;
-    pieceGroup.position.y += 0.3; // Elevar la pieza mágicamente
+
+    // Elevar la pieza 3D mágicamente
+    pieceGroup.position.y = 0.35;
+
+    // Mostrar anillo dorado bajo la casilla
+    selectRing.position.set(pieceGroup.position.x, 0.11, pieceGroup.position.z);
+    selectRing.visible = true;
   }
 
   function clearSelection() {
     if (selectedPieceGroup) {
-      selectedPieceGroup.position.y = 0.1;
+      selectedPieceGroup.position.y = 0.0;
     }
     selectedSquare = null;
     selectedPieceGroup = null;
+    selectRing.visible = false;
   }
 
   container.addEventListener('pointerdown', onPointerDown);
   window.addEventListener('pointermove', onPointerMove);
   window.addEventListener('pointerup', onPointerUp);
 
-  // Escuchar mensajes de React Native
-  window.addEventListener('message', (e) => {
+  // Escuchar mensajes entrantes desde React Native
+  function handleIncomingMessage(raw) {
     try {
-      const data = JSON.parse(e.data);
-      if (data.type === 'SET_FEN') {
+      const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (data.type === 'SYNC_STATE') {
         loadFen(data.fen);
-        if (data.flipped) {
-          rig.rotation.y = Math.PI;
-        }
+        currentTurnState = data.turn || 'w';
+        isFlippedState = !!data.flipped;
+        if (data.autoRotate !== undefined) autoRotateEnabled = data.autoRotate;
+        updateTargetTilt();
+      } else if (data.type === 'SET_AUTO_ROTATE') {
+        autoRotateEnabled = !!data.value;
+        if (autoRotateEnabled) updateTargetTilt();
       } else if (data.type === 'RESET_CAMERA') {
-        rig.rotation.set(-0.55, 0, 0);
+        updateTargetTilt();
       }
     } catch (err) {}
-  });
+  }
 
-  document.addEventListener('message', (e) => {
-    try {
-      const data = JSON.parse(e.data);
-      if (data.type === 'SET_FEN') {
-        loadFen(data.fen);
-      } else if (data.type === 'RESET_CAMERA') {
-        rig.rotation.set(-0.55, 0, 0);
-      }
-    } catch (err) {}
-  });
+  window.addEventListener('message', (e) => handleIncomingMessage(e.data));
+  document.addEventListener('message', (e) => handleIncomingMessage(e.data));
 
-  // Animación continua
+  // Ciclo de animación continua con rotación suave (Lerp)
   function animate() {
     requestAnimationFrame(animate);
+
+    if (!isDragging && autoRotateEnabled) {
+      // Interpolación angular para eje Y
+      let diffY = targetRigRotationY - rig.rotation.y;
+      while (diffY < -Math.PI) diffY += Math.PI * 2;
+      while (diffY > Math.PI) diffY -= Math.PI * 2;
+
+      rig.rotation.y += diffY * 0.07;
+      rig.rotation.x += (targetRigRotationX - rig.rotation.x) * 0.07;
+    }
+
     renderer.render(scene, camera);
   }
   animate();
 
-  // Redimensión si rota la pantalla
+  // Ajuste automático al cambiar tamaño o rotación
   window.addEventListener('resize', () => {
     width = window.innerWidth;
     height = window.innerHeight;
@@ -370,9 +588,19 @@ export default function Chessboard3D({ fen, onMove, flipped = false, gestureEnab
         scrollEnabled={false}
         style={styles.webview}
       />
-      <TouchableOpacity style={styles.resetCamButton} onPress={resetCamera}>
-        <Text style={styles.resetCamText}>📷 Centrar Cámara</Text>
-      </TouchableOpacity>
+
+      {/* Controles de cámara en la esquina superior del tablero 3D */}
+      <View style={styles.overlayControls}>
+        <TouchableOpacity style={styles.ctrlPill} onPress={toggleAutoRotate} activeOpacity={0.8}>
+          <Text style={[styles.ctrlText, autoRotate && styles.ctrlTextActive]}>
+            {autoRotate ? '🧭 Giro Turno: ON' : '⏸️ Giro: OFF'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.ctrlPill} onPress={resetCamera} activeOpacity={0.8}>
+          <Text style={styles.ctrlText}>📷 Centrar</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -380,29 +608,40 @@ export default function Chessboard3D({ fen, onMove, flipped = false, gestureEnab
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    aspectRatio: 1,
-    borderRadius: 12,
+    height: '100%',
+    backgroundColor: '#0c1a2e',
     overflow: 'hidden',
-    backgroundColor: '#0f0f14',
   },
   webview: {
     flex: 1,
-    backgroundColor: '#0f0f14',
+    backgroundColor: '#0c1a2e',
   },
-  resetCamButton: {
+  overlayControls: {
     position: 'absolute',
-    top: 10,
-    left: 10,
-    backgroundColor: 'rgba(27, 27, 36, 0.85)',
-    paddingHorizontal: 10,
+    top: 8,
+    left: 8,
+    flexDirection: 'row',
+    gap: 6,
+  },
+  ctrlPill: {
+    backgroundColor: 'rgba(12, 27, 48, 0.88)',
+    paddingHorizontal: 9,
     paddingVertical: 5,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#444',
+    borderColor: '#d3a625',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 3,
   },
-  resetCamText: {
-    color: '#d3a625',
+  ctrlText: {
+    color: '#cbd5e1',
     fontSize: 11,
     fontWeight: 'bold',
+  },
+  ctrlTextActive: {
+    color: '#ffd32a',
   },
 });

@@ -10,9 +10,11 @@ import {
   Image,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getSavedGame, clearSavedGame, getPlayerStats } from '../utils/gameStorage';
 
 export default function HomeScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [savedGame, setSavedGame] = useState(null);
   const [stats, setStats] = useState({ wins: 0, losses: 0, draws: 0 });
   const [difficultyModalVisible, setDifficultyModalVisible] = useState(false);
@@ -173,7 +175,18 @@ export default function HomeScreen({ navigation }) {
   ];
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContainer} style={styles.container}>
+    <ScrollView
+      contentContainerStyle={[
+        styles.scrollContainer,
+        {
+          paddingTop: Math.max(insets.top + 14, 40),
+          paddingBottom: Math.max(insets.bottom + 24, 40),
+          paddingLeft: Math.max(insets.left + 16, 20),
+          paddingRight: Math.max(insets.right + 16, 20),
+        },
+      ]}
+      style={styles.container}
+    >
       {/* Cabecera con Logo de Caballo e Identidad Jake-Mate */}
       <View style={styles.header}>
         <View style={styles.logoRing}>

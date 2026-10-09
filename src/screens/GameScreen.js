@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -6,34 +6,34 @@ import {
   TouchableOpacity,
   Alert,
   Modal,
-  SafeAreaView,
   StatusBar,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chessboard from 'react-native-chessboard';
 import Chessboard3D from '../components/Chessboard3D';
 import { getBestMove } from '../utils/chessAi';
 import { saveGameLocally, recordGameResult } from '../utils/gameStorage';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-// Board size exactly divisible by 8 for crisp Skia squares
-const BOARD_SIZE = Math.floor(Math.min(SCREEN_WIDTH - 20, 392) / 8) * 8;
-
 // Componente decorativo de la Escarapela Argentina
-const Escarapela = () => (
-  <View style={styles.escarapelaWrap}>
-    <View style={styles.escarapelaOuter}>
-      <View style={styles.escarapelaMid}>
-        <View style={styles.escarapelaInner} />
+const Escarapela = ({ compact = false }) => {
+  const outer = compact ? 12 : 15;
+  const mid = compact ? 7 : 9;
+  const inner = compact ? 3 : 4;
+  return (
+    <View style={styles.escarapelaWrap}>
+      <View style={[styles.escarapelaOuter, { width: outer, height: outer, borderRadius: outer / 2 }]}>
+        <View style={[styles.escarapelaMid, { width: mid, height: mid, borderRadius: mid / 2 }]}>
+          <View style={[styles.escarapelaInner, { width: inner, height: inner, borderRadius: inner / 2 }]} />
+        </View>
+      </View>
+      <View style={styles.ribbonContainer}>
+        <View style={[styles.ribbon, styles.ribbonLeft, compact && { height: 4 }]} />
+        <View style={[styles.ribbon, styles.ribbonRight, compact && { height: 4 }]} />
       </View>
     </View>
-    {/* Cintas colgantes */}
-    <View style={styles.ribbonContainer}>
-      <View style={[styles.ribbon, styles.ribbonLeft]} />
-      <View style={[styles.ribbon, styles.ribbonRight]} />
-    </View>
-  </View>
-);
+  );
+};
 
 export default function GameScreen({ route, navigation }) {
   const {
@@ -45,6 +45,36 @@ export default function GameScreen({ route, navigation }) {
   } = route.params || {};
 
   const currentDifficulty = savedGame ? savedGame.difficulty || difficulty : difficulty;
+
+  // Detección dinámica y reactiva del tamaño de pantalla y márgenes seguros (notch / botones Android)
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+
+  const safeTop = Math.max(insets.top, 12);
+  const safeBottom = Math.max(insets.bottom, 14);
+  const safeLeft = Math.max(insets.left, 8);
+  const safeRight = Math.max(insets.right, 8);
+
+  const availableWidth = width - safeLeft - safeRight;
+  const availableHeight = height - safeTop - safeBottom;
+
+  const isCompactHeight = availableHeight < 680;
+  const isVeryShort = availableHeight < 600;
+
+  // Alturas proporcionales
+  const topBarHeight = isCompactHeight ? 40 : 46;
+  const playerCardHeight = isCompactHeight ? 54 : 64;
+  const verticalGaps = isCompactHeight ? 16 : 28;
+
+  // Tamaño óptimo del tablero garantizando que nunca se desborde en ninguna pantalla
+  const maxBoardByWidth = availableWidth - 16;
+  const maxBoardByHeight = availableHeight - topBarHeight - (playerCardHeight * 2) - verticalGaps;
+
+  const calculatedBoardSize = Math.max(
+    Math.floor(Math.min(maxBoardByWidth, maxBoardByHeight) / 8) * 8,
+    224
+  );
+  const boardSize = calculatedBoardSize;
 
   const chessboardRef = useRef(null);
   const timerIntervalRef = useRef(null);
@@ -388,8 +418,18 @@ export default function GameScreen({ route, navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0d1e36" />
+    <View
+      style={[
+        styles.container,
+        {
+          paddingTop: safeTop,
+          paddingBottom: safeBottom,
+          paddingLeft: safeLeft,
+          paddingRight: safeRight,
+        },
+      ]}
+    >
+      <StatusBar barStyle="light-content" backgroundColor="#0d1e36" translucent={true} />
 
       {/* Fondo patriótico albiceleste (renderizado en background sin zIndex negativo) */}
       <View style={styles.flagBackground} pointerEvents="none">
@@ -400,9 +440,11 @@ export default function GameScreen({ route, navigation }) {
       </View>
 
       {/* Barra Superior */}
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, isCompactHeight && { paddingVertical: 2 }]}>
         <View style={styles.titleContainer}>
-          <Text style={styles.modeTitle} numberOfLines={1}>{getModeTitle()}</Text>
+          <Text style={[styles.modeTitle, isCompactHeight && { fontSize: 18 }]} numberOfLines={1}>
+            {getModeTitle()}
+          </Text>
           <View style={styles.turnBadgeRow}>
             <Text style={styles.turnLabel}>Turno:</Text>
             <View style={[styles.turnDot, { backgroundColor: currentTurn === 'w' ? '#ffffff' : '#222222' }]} />
@@ -416,7 +458,7 @@ export default function GameScreen({ route, navigation }) {
 
         <View style={styles.topActions}>
           <TouchableOpacity
-            style={[styles.viewToggleButton, viewMode === '3d' && styles.viewToggleActive]}
+            style={[styles.viewToggleButton, viewMode === '3d' && styles.viewToggleActive, isCompactHeight && { paddingVertical: 4, paddingHorizontal: 10 }]}
             onPress={() => setViewMode((prev) => (prev === '2d' ? '3d' : '2d'))}
             activeOpacity={0.8}
           >
@@ -426,25 +468,34 @@ export default function GameScreen({ route, navigation }) {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.settingsCircleButton}
+            style={[styles.settingsCircleButton, isCompactHeight && { width: 32, height: 32, borderRadius: 16 }]}
             onPress={() => setMenuVisible(true)}
             activeOpacity={0.8}
           >
-            <Text style={styles.settingsIconText}>⚙️</Text>
+            <Text style={[styles.settingsIconText, isCompactHeight && { fontSize: 14 }]}>⚙️</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       {/* TARJETA SUPERIOR (JUGADOR NEGRAS) */}
-      <View style={[styles.playerCard, styles.playerCardBlack, currentTurn === 'b' && !isGameOver && styles.activeCardBlack]}>
+      <View
+        style={[
+          styles.playerCard,
+          styles.playerCardBlack,
+          currentTurn === 'b' && !isGameOver && styles.activeCardBlack,
+          isCompactHeight && styles.playerCardCompact,
+        ]}
+      >
         <View style={styles.playerInfoRow}>
           {/* Avatar con Escarapela */}
-          <View style={styles.avatarWrapper}>
-            <View style={styles.blackAvatarSphere} />
-            <Escarapela />
+          <View style={[styles.avatarWrapper, isCompactHeight && styles.avatarWrapperCompact]}>
+            <View style={[styles.blackAvatarSphere, isCompactHeight && styles.avatarSphereCompact]} />
+            <Escarapela compact={isCompactHeight} />
           </View>
           <View style={styles.playerTexts}>
-            <Text style={styles.blackPlayerTitle} numberOfLines={1}>{getOpponentLabel()}</Text>
+            <Text style={[styles.blackPlayerTitle, isCompactHeight && { fontSize: 13 }]} numberOfLines={1}>
+              {getOpponentLabel()}
+            </Text>
             {mode === 'timer' && (
               <Text style={styles.clockTextBlack}>⏱️ {formatTime(blackTime)}</Text>
             )}
@@ -457,29 +508,29 @@ export default function GameScreen({ route, navigation }) {
         {/* Botones Tablas y Rendirme */}
         <View style={styles.actionButtonsRow}>
           <TouchableOpacity
-            style={styles.tablasButtonBlack}
+            style={[styles.tablasButtonBlack, isCompactHeight && styles.actionBtnCompact]}
             onPress={() => handleDrawOffer('b')}
             activeOpacity={0.8}
           >
-            <Text style={styles.tablasButtonTextBlack}>🤝 Tablas</Text>
+            <Text style={[styles.tablasButtonTextBlack, isCompactHeight && { fontSize: 10 }]}>🤝 Tablas</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.rendirmeButton}
+            style={[styles.rendirmeButton, isCompactHeight && styles.actionBtnCompact]}
             onPress={() => handleSurrender('b')}
             activeOpacity={0.8}
           >
-            <Text style={styles.rendirmeButtonText}>🚩 Rendirme</Text>
+            <Text style={[styles.rendirmeButtonText, isCompactHeight && { fontSize: 10 }]}>🚩 Rendirme</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       {/* TABLERO DE AJEDREZ (Marco Dorado & Albiceleste) */}
-      <View style={[styles.boardWrapper, { width: BOARD_SIZE + 6, height: BOARD_SIZE + 6 }]}>
+      <View style={[styles.boardWrapper, { width: boardSize + 6, height: boardSize + 6 }]}>
         <View style={viewMode === '2d' ? styles.visibleBoard : styles.hiddenBoard}>
           <Chessboard
             ref={chessboardRef}
-            boardSize={BOARD_SIZE}
+            boardSize={boardSize}
             onMove={handleMove}
             gestureEnabled={!isGameOver && !(mode === 'bot' && currentTurn === 'b')}
             flipped={isFlipped}
@@ -498,6 +549,7 @@ export default function GameScreen({ route, navigation }) {
             <Chessboard3D
               fen={currentFen}
               onMove={handleMove3D}
+              turn={currentTurn}
               flipped={isFlipped}
               gestureEnabled={!isGameOver && !(mode === 'bot' && currentTurn === 'b')}
             />
@@ -506,15 +558,22 @@ export default function GameScreen({ route, navigation }) {
       </View>
 
       {/* TARJETA INFERIOR (JUGADOR BLANCAS) */}
-      <View style={[styles.playerCard, styles.playerCardWhite, currentTurn === 'w' && !isGameOver && styles.activeCardWhite]}>
+      <View
+        style={[
+          styles.playerCard,
+          styles.playerCardWhite,
+          currentTurn === 'w' && !isGameOver && styles.activeCardWhite,
+          isCompactHeight && styles.playerCardCompact,
+        ]}
+      >
         <View style={styles.playerInfoRow}>
           {/* Avatar con Escarapela */}
-          <View style={styles.avatarWrapper}>
-            <View style={styles.whiteAvatarSphere} />
-            <Escarapela />
+          <View style={[styles.avatarWrapper, isCompactHeight && styles.avatarWrapperCompact]}>
+            <View style={[styles.whiteAvatarSphere, isCompactHeight && styles.avatarSphereCompact]} />
+            <Escarapela compact={isCompactHeight} />
           </View>
           <View style={styles.playerTexts}>
-            <Text style={styles.whitePlayerTitle} numberOfLines={1}>
+            <Text style={[styles.whitePlayerTitle, isCompactHeight && { fontSize: 13 }]} numberOfLines={1}>
               {mode === 'bot' ? '🧙‍♂️ Tú (Blancas)' : 'Jugador Blancas'}
             </Text>
             {mode === 'timer' && (
@@ -529,19 +588,19 @@ export default function GameScreen({ route, navigation }) {
         {/* Botones Tablas y Rendirme */}
         <View style={styles.actionButtonsRow}>
           <TouchableOpacity
-            style={styles.tablasButtonWhite}
+            style={[styles.tablasButtonWhite, isCompactHeight && styles.actionBtnCompact]}
             onPress={() => handleDrawOffer('w')}
             activeOpacity={0.8}
           >
-            <Text style={styles.tablasButtonTextWhite}>🤝 Tablas</Text>
+            <Text style={[styles.tablasButtonTextWhite, isCompactHeight && { fontSize: 10 }]}>🤝 Tablas</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.rendirmeButton}
+            style={[styles.rendirmeButton, isCompactHeight && styles.actionBtnCompact]}
             onPress={() => handleSurrender('w')}
             activeOpacity={0.8}
           >
-            <Text style={styles.rendirmeButtonText}>🚩 Rendirme</Text>
+            <Text style={[styles.rendirmeButtonText, isCompactHeight && { fontSize: 10 }]}>🚩 Rendirme</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -649,7 +708,7 @@ export default function GameScreen({ route, navigation }) {
           </View>
         </TouchableOpacity>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -658,7 +717,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0c1b30',
     justifyContent: 'space-between',
-    paddingVertical: 12,
     alignItems: 'center',
   },
   // Fondo ondeante celeste y blanco
@@ -765,7 +823,7 @@ const styles = StyleSheet.create({
   },
   // Tarjetas de Jugadores (Cápsulas)
   playerCard: {
-    width: '92%',
+    width: '94%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -779,6 +837,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 6,
     elevation: 4,
+  },
+  playerCardCompact: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 18,
   },
   playerCardBlack: {
     backgroundColor: '#0c1b30',
@@ -797,30 +860,39 @@ const styles = StyleSheet.create({
   playerInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
     flex: 1,
   },
   avatarWrapper: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  avatarWrapperCompact: {
+    width: 32,
+    height: 32,
+  },
   blackAvatarSphere: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#181a20',
     borderWidth: 2,
     borderColor: '#d3a625',
   },
   whiteAvatarSphere: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#f1f5f9',
     borderWidth: 2,
     borderColor: '#d3a625',
+  },
+  avatarSphereCompact: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
   },
   playerTexts: {
     flex: 1,
@@ -833,9 +905,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   escarapelaOuter: {
-    width: 15,
-    height: 15,
-    borderRadius: 7.5,
     backgroundColor: '#4a90e2',
     justifyContent: 'center',
     alignItems: 'center',
@@ -843,17 +912,11 @@ const styles = StyleSheet.create({
     borderColor: '#fff',
   },
   escarapelaMid: {
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
     backgroundColor: '#ffffff',
     justifyContent: 'center',
     alignItems: 'center',
   },
   escarapelaInner: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
     backgroundColor: '#4a90e2',
   },
   ribbonContainer: {
@@ -905,6 +968,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  actionBtnCompact: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
   },
   tablasButtonBlack: {
     backgroundColor: '#183863',
